@@ -1,0 +1,265 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+.animate-slideIn {
+  animation: slideIn 0.3s ease-out;
+}
+
+@layer base {
+  .dark {
+    color-scheme: dark;
+  }
+
+  /* Default readable text inside the app shell */
+  .dark main {
+    color: #cccccc;
+  }
+
+  main {
+    color: #333333;
+  }
+
+  .dark main h1,
+  .dark main h2,
+  .dark main h3,
+  .dark main h4 {
+    @apply text-white;
+  }
+
+  /* Table body — minimum contrast in both modes */
+  main tbody td {
+    color: #333333;
+  }
+
+  .dark main tbody td {
+    color: #cccccc;
+  }
+
+  main thead th {
+    color: #ffffff;
+  }
+
+  .dark main tbody td .font-bold,
+  .dark main tbody td .font-medium,
+  .dark main p.font-bold,
+  .dark main p.font-semibold,
+  .dark main span.font-bold {
+    color: #cccccc;
+  }
+
+  main tbody td .font-bold,
+  main tbody td .font-medium {
+    color: #333333;
+  }
+
+  .dark main label,
+  .dark main li {
+    color: #cccccc;
+  }
+
+  .dark main pre {
+    @apply text-gray-200 bg-gray-900;
+  }
+
+  .dark main svg text {
+    fill: #9ca3af;
+  }
+}
+
+@layer utilities {
+  /* Remap light-mode gray text utilities in dark mode */
+  .dark .text-gray-900,
+  .dark .text-gray-800 {
+    color: rgb(243 244 246);
+  }
+
+  .dark .text-gray-700 {
+    color: rgb(229 231 235);
+  }
+
+  .dark .text-gray-600 {
+    color: rgb(209 213 219);
+  }
+
+  .dark .text-gray-500 {
+    color: rgb(156 163 175);
+  }
+
+  .dark .text-gray-300 {
+    color: rgb(156 163 175);
+  }
+
+  .dark .text-\[\#1a1a1a\] {
+    color: rgb(255 255 255);
+  }
+
+  .dark .hover\:text-gray-800:hover {
+    color: rgb(229 231 235);
+  }
+
+  /* Semantic colors — lighter shades for dark backgrounds */
+  .dark .text-red-700 {
+    color: rgb(252 165 165);
+  }
+
+  .dark .text-red-600 {
+    color: rgb(248 113 113);
+  }
+
+  .dark .text-green-700 {
+    color: rgb(134 239 172);
+  }
+
+  .dark .text-green-600 {
+    color: rgb(74 222 128);
+  }
+
+  .dark .text-orange-700 {
+    color: rgb(253 186 116);
+  }
+
+  .dark .text-orange-600 {
+    color: rgb(251 146 60);
+  }
+
+  .dark .text-blue-700 {
+    color: rgb(147 197 253);
+  }
+
+  .dark .text-yellow-700 {
+    color: rgb(253 224 71);
+  }
+
+  .dark .text-yellow-800 {
+    color: rgb(254 240 138);
+  }
+
+  .dark .text-yellow-900 {
+    color: rgb(254 240 138);
+  }
+
+  /* Status badge backgrounds */
+  .dark .bg-red-100 {
+    @apply bg-red-950/60;
+  }
+
+  .dark .bg-yellow-100 {
+    @apply bg-yellow-950/60;
+  }
+
+  .dark .bg-orange-100 {
+    @apply bg-orange-950/60;
+  }
+
+  .dark .bg-green-100 {
+    @apply bg-green-950/60;
+  }
+
+  .dark .bg-blue-100 {
+    @apply bg-blue-950/60;
+  }
+
+  .dark .bg-red-50 {
+    @apply bg-red-950/40;
+  }
+
+  .dark .hover\:bg-green-200:hover {
+    @apply bg-green-900/60;
+  }
+
+  /* Header badges */
+  .dark .bg-red-100.text-red-700 {
+    background-color: rgb(127 29 29 / 0.7);
+    color: rgb(254 202 202);
+  }
+
+  .dark .bg-blue-100.text-blue-700 {
+    background-color: rgb(30 58 138 / 0.7);
+    color: rgb(191 219 254);
+  }
+
+  .dark .bg-gray-200 {
+    background-color: rgb(55 65 81);
+    color: rgb(229 231 235);
+  }
+
+  .dark .hover\:bg-gray-300:hover {
+    background-color: rgb(75 85 99);
+  }
+
+  .dark .bg-gray-300 {
+    background-color: rgb(75 85 99);
+  }
+}
+
+@layer components {
+  .ultt-card {
+    @apply bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100;
+  }
+  .ultt-input {
+    @apply bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 rounded-lg;
+  }
+  .ultt-select {
+    @apply bg-white dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 rounded-lg;
+  }
+  .ultt-page-title {
+    @apply text-2xl font-bold text-gray-900 dark:text-white;
+  }
+  .ultt-text-secondary {
+    @apply text-gray-500 dark:text-gray-400;
+  }
+  .ultt-section-title {
+    @apply font-semibold text-gray-900 dark:text-white;
+  }
+
+  .ultt-table-cell {
+    color: #333333;
+  }
+
+  .dark .ultt-table-cell {
+    color: #cccccc;
+  }
+
+  /* Paid / resolved rows — subtle fade, never below 70% opacity */
+  .ultt-row-paid {
+    opacity: 0.7;
+  }
+
+  .ultt-row-paid:hover {
+    opacity: 0.85;
+  }
+
+  /* Row tint backgrounds readable in dark mode */
+  .dark .bg-green-50 {
+    background-color: rgb(20 83 45 / 0.25);
+  }
+
+  .dark .bg-yellow-50 {
+    background-color: rgb(113 63 18 / 0.25);
+  }
+
+  .dark .bg-orange-50 {
+    background-color: rgb(124 45 18 / 0.25);
+  }
+
+  .dark .bg-red-50 {
+    background-color: rgb(127 29 29 / 0.25);
+  }
+
+  .dark .bg-gray-50 {
+    background-color: rgb(55 65 81 / 0.4);
+  }
+}
