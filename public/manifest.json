@@ -1,0 +1,21 @@
+{
+  "name": "Uganda Land Tax Tracker",
+  "short_name": "ULTT",
+  "description": "Official Uganda Land Tax Enforcement Platform for Local Governments",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#111111",
+  "theme_color": "#C8102E",
+  "orientation": "portrait-primary",
+  "lang": "en",
+  "categories": ["finance", "government", "productivity"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

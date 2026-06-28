@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   LayoutDashboard,
   Building2,
@@ -28,6 +28,8 @@ import {
   ArrowRight,
   RefreshCw,
   Upload,
+  ChevronLeft,
+  ChevronRight,
   Users,
   Video,
   Share2,
@@ -88,6 +90,11 @@ const subMonths = (date: Date, months: number): Date => {
 };
 
 // Types
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+}
+
 interface Property {
   id: number;
   plotNumber: string;
@@ -267,7 +274,29 @@ export default function App() {
     const saved = localStorage.getItem('ultt_theme');
     return saved === 'light' || saved === 'dark' || saved === 'auto' ? saved : 'auto';
   });
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [showInstall, setShowInstall] = useState(false);
   const [systemDark, setSystemDark] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setInstallPrompt(e as BeforeInstallPromptEvent);
+      setShowInstall(true);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstall = async () => {
+    if (installPrompt) {
+      installPrompt.prompt();
+      const result = await installPrompt.userChoice;
+      if (result.outcome === 'accepted') {
+        setShowInstall(false);
+      }
+    }
+  };
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [showDetailPanel, setShowDetailPanel] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -469,12 +498,13 @@ export default function App() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 h-full w-64 z-40 bg-[#1a1a1a] dark:bg-gray-950 transition-transform duration-300 shrink-0
+        className={`fixed top-0 left-0 h-full z-40 bg-[#1a1a1a] dark:bg-gray-950 transition-transform duration-300 shrink-0 w-[220px] min-w-[220px]
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
           md:relative md:translate-x-0`}
+        style={{ width: 220, minWidth: 220, flexShrink: 0 }}
       >
-        <div className="flex flex-col h-full">
-          <div className="p-4">
+        <div className="flex flex-col h-full overflow-hidden">
+          <div className="p-4 pl-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-[#C8102E] rounded flex items-center justify-center">
                 <MapPin className="text-white" size={24} />
@@ -486,7 +516,7 @@ export default function App() {
             </div>
           </div>
 
-          <nav className="flex-1 px-2 py-4 overflow-y-auto">
+          <nav className="flex-1 py-4 overflow-y-auto overflow-x-visible pl-4 pr-2">
             {rolePages.map((page) => (
               <button
                 key={page.id}
@@ -494,7 +524,8 @@ export default function App() {
                   setCurrentPage(page.id);
                   if (isMobile) setSidebarOpen(false);
                 }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg mb-1 transition-all ${
+                style={{ paddingLeft: 16 }}
+                className={`w-full flex items-center gap-3 pr-4 py-3 rounded-lg mb-1 transition-all text-left ${
                   currentPage === page.id
                     ? 'bg-[#C8102E] text-white'
                     : 'highlight' in page && page.highlight
@@ -502,8 +533,8 @@ export default function App() {
                     : 'text-gray-300 hover:bg-gray-800'
                 }`}
               >
-                <page.icon size={20} />
-                <span className="text-sm font-medium">{page.label}</span>
+                <page.icon size={20} className="shrink-0" />
+                <span className="text-sm font-medium truncate">{page.label}</span>
               </button>
             ))}
           </nav>
@@ -527,6 +558,25 @@ export default function App() {
             <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 text-gray-400 hover:text-white text-sm py-2">
               <LogOut size={16} /> Logout
             </button>
+            {showInstall && (
+              <button
+                onClick={handleInstall}
+                style={{
+                  backgroundColor: '#C8102E',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '8px 16px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                  width: '100%',
+                  marginTop: '8px',
+                }}
+              >
+                📱 Install App
+              </button>
+            )}
             <p className="text-gray-500 dark:text-gray-400 text-xs mt-3 text-center">ULTT v1.0 — Official Platform</p>
             <p className="text-gray-600 dark:text-gray-400 text-xs text-center">Licensed to: {settings.authorityName || 'Configure in Settings'}</p>
           </div>
@@ -534,7 +584,7 @@ export default function App() {
       </aside>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0 pt-16 md:pt-0 min-h-screen">
+      <div className="flex-1 flex flex-col min-w-0 pt-16 md:pt-0 min-h-screen overflow-hidden">
         {/* Header */}
         <header className="hidden md:flex h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 items-center justify-end px-6">
           <div className="flex items-center gap-4">
@@ -563,7 +613,7 @@ export default function App() {
         {demoMode && <DemoModeBanner />}
 
         {/* Page Content */}
-        <main className="p-4 md:p-6 animate-fadeIn flex-1">
+        <main className="p-4 md:p-6 animate-fadeIn flex-1 overflow-auto min-w-0">
           {currentPage === 'dashboard' && (
             <DashboardPage properties={filteredProperties} enforcementActions={enforcementActions} />
           )}
@@ -1521,6 +1571,36 @@ function UgandaMapPage({
 }
 
 // Enforcement Pipeline Page
+const PIPELINE_STAGES = [
+  { id: 'interest_accruing', label: 'Stage 1: Interest Accruing', headerBg: '#FCDD09', headerText: '#1a1a1a', border: '#FCDD09' },
+  { id: 'demand_notice', label: 'Stage 2: Demand Notice', headerBg: '#e07b00', headerText: '#ffffff', border: '#e07b00' },
+  { id: 'rent_interception', label: 'Stage 3: Rent Interception', headerBg: '#C8102E', headerText: '#ffffff', border: '#C8102E' },
+  { id: 'legal_action', label: 'Stage 4: Legal Action', headerBg: '#7a0000', headerText: '#ffffff', border: '#7a0000' },
+  { id: 'resolved', label: 'Stage 5: Resolved', headerBg: '#1a7a4a', headerText: '#ffffff', border: '#1a7a4a' },
+] as const;
+
+function getPipelineActionStyle(action: string): string {
+  if (action === 'Send reminder' || action === 'Monitor') return 'bg-blue-600 hover:bg-blue-700 text-white';
+  if (action === 'Issue notice') return 'bg-orange-600 hover:bg-orange-700 text-white';
+  if (action === 'Serve tenant notice') return 'bg-red-600 hover:bg-red-700 text-white';
+  if (action === 'Update court case') return 'bg-red-900 hover:bg-red-950 text-white';
+  return 'bg-gray-600 hover:bg-gray-700 text-white';
+}
+
+function getDaysOverdueDisplay(days: number) {
+  if (days > 180) {
+    return (
+      <span className="text-red-700 dark:text-red-400 font-bold flex items-center gap-1">
+        <AlertTriangle size={12} /> {days} days overdue
+      </span>
+    );
+  }
+  if (days >= 90) {
+    return <span className="text-red-600 dark:text-red-400">{days} days overdue</span>;
+  }
+  return <span className="text-orange-600 dark:text-orange-400">{days} days overdue</span>;
+}
+
 function EnforcementPipelinePage({
   properties,
   setProperties,
@@ -1536,30 +1616,72 @@ function EnforcementPipelinePage({
   showToast: (message: string, type?: 'success' | 'error') => void;
   isActionDisabled: boolean;
 }) {
-  const stages = [
-    { id: 'interest_accruing', label: 'Stage 1: Interest Accruing' },
-    { id: 'demand_notice', label: 'Stage 2: Demand Notice' },
-    { id: 'rent_interception', label: 'Stage 3: Rent Interception' },
-    { id: 'legal_action', label: 'Stage 4: Legal Action' },
-    { id: 'resolved', label: 'Stage 5: Resolved' },
-  ];
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
 
   const stageProperties = useMemo(() => {
     const result: { [key: string]: Property[] } = {};
-    stages.forEach(s => {
+    PIPELINE_STAGES.forEach(s => {
       result[s.id] = properties.filter(p => p.enforcementStage === s.id);
     });
     return result;
   }, [properties]);
 
+  const pipelineSummary = useMemo(() => {
+    const active = properties.filter(p => p.enforcementStage !== 'resolved');
+    const totalValue = active.reduce((sum, p) => {
+      const penalty = calculatePenalty(p.annualTaxDue, p.taxDueDate);
+      return sum + penalty.totalOwed;
+    }, 0);
+    const avgDays = active.length
+      ? Math.round(active.reduce((sum, p) => sum + calculatePenalty(p.annualTaxDue, p.taxDueDate).daysOverdue, 0) / active.length)
+      : 0;
+    const now = new Date();
+    const resolvedThisMonth = properties.filter(p => {
+      if (p.enforcementStage !== 'resolved' || !p.lastPaymentDate) return false;
+      const d = new Date(p.lastPaymentDate);
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    }).length;
+    return {
+      totalCases: active.length,
+      totalValue,
+      avgDaysOverdue: avgDays,
+      resolvedThisMonth,
+    };
+  }, [properties]);
+
+  const updateScrollButtons = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 0);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
+  }, []);
+
+  useEffect(() => {
+    updateScrollButtons();
+    const el = scrollRef.current;
+    if (!el) return;
+    el.addEventListener('scroll', updateScrollButtons);
+    window.addEventListener('resize', updateScrollButtons);
+    return () => {
+      el.removeEventListener('scroll', updateScrollButtons);
+      window.removeEventListener('resize', updateScrollButtons);
+    };
+  }, [updateScrollButtons, properties]);
+
+  const scrollPipeline = (direction: 'left' | 'right') => {
+    scrollRef.current?.scrollBy({ left: direction === 'left' ? -300 : 300, behavior: 'smooth' });
+  };
+
   const advanceStage = (property: Property) => {
-    const currentIndex = stages.findIndex(s => s.id === property.enforcementStage);
-    if (currentIndex < stages.length - 1) {
-      const newStage = stages[currentIndex + 1].id;
+    const currentIndex = PIPELINE_STAGES.findIndex(s => s.id === property.enforcementStage);
+    if (currentIndex < PIPELINE_STAGES.length - 1) {
+      const newStage = PIPELINE_STAGES[currentIndex + 1].id;
       setProperties(prev => prev.map(p =>
         p.id === property.id ? { ...p, enforcementStage: newStage } : p
       ));
-      addActivity(property.id, property.plotNumber, `Advanced to ${stages[currentIndex + 1].label}`);
+      addActivity(property.id, property.plotNumber, `Advanced to ${PIPELINE_STAGES[currentIndex + 1].label}`);
       showToast(`Property ${property.plotNumber} advanced to next stage`);
     }
   };
@@ -1568,57 +1690,163 @@ function EnforcementPipelinePage({
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-[#1a1a1a] dark:text-white">Enforcement Pipeline</h1>
 
-      <div className="overflow-x-auto pb-4">
-        <div className="flex gap-4 min-w-max">
-          {stages.map((stage) => (
-            <div key={stage.id} className="w-72 flex-shrink-0">
-              <div className="bg-gray-100 rounded-t-lg px-4 py-3 flex items-center justify-between">
-                <h3 className="font-semibold text-sm">{stage.label}</h3>
-                <span className="bg-[#C8102E] text-white text-xs font-bold px-2 py-1 rounded-full">
-                  {stageProperties[stage.id].length}
-                </span>
-              </div>
-              <div className="bg-white dark:bg-gray-800 rounded-b-lg shadow p-3 space-y-3 max-h-96 overflow-y-auto">
-                {stageProperties[stage.id].map((p) => {
-                  const penalty = calculatePenalty(p.annualTaxDue, p.taxDueDate);
-                  return (
-                    <div
-                      key={p.id}
-                      className="bg-gray-50 dark:bg-gray-750 rounded-lg p-3 border-l-4 border-red-400"
+      {/* Summary row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow px-4 py-3 border border-gray-200 dark:border-gray-700">
+          <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Total Cases</p>
+          <p className="text-xl font-bold text-[#1a1a1a] dark:text-white">{pipelineSummary.totalCases}</p>
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow px-4 py-3 border border-gray-200 dark:border-gray-700">
+          <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Total Value</p>
+          <p className="text-xl font-bold text-red-600">{formatCurrency(pipelineSummary.totalValue)}</p>
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow px-4 py-3 border border-gray-200 dark:border-gray-700">
+          <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Avg Days Overdue</p>
+          <p className="text-xl font-bold text-orange-600">{pipelineSummary.avgDaysOverdue} days</p>
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow px-4 py-3 border border-gray-200 dark:border-gray-700">
+          <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Resolved This Month</p>
+          <p className="text-xl font-bold text-green-600">{pipelineSummary.resolvedThisMonth}</p>
+        </div>
+      </div>
+
+      {/* Kanban board with scroll arrows */}
+      <div className="relative">
+        {canScrollLeft && (
+          <button
+            type="button"
+            onClick={() => scrollPipeline('left')}
+            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200"
+            aria-label="Scroll pipeline left"
+          >
+            <ChevronLeft size={22} />
+          </button>
+        )}
+        {canScrollRight && (
+          <button
+            type="button"
+            onClick={() => scrollPipeline('right')}
+            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200"
+            aria-label="Scroll pipeline right"
+          >
+            <ChevronRight size={22} />
+          </button>
+        )}
+
+        <div
+          ref={scrollRef}
+          className="overflow-x-auto pb-4 scroll-smooth px-2"
+          style={{ scrollbarWidth: 'thin' }}
+        >
+          <div className="flex gap-4 min-w-max">
+            {PIPELINE_STAGES.map((stage) => {
+              const isResolved = stage.id === 'resolved';
+              return (
+                <div key={stage.id} className="w-72 flex-shrink-0">
+                  <div
+                    className="rounded-t-lg px-4 py-3 flex items-center justify-between"
+                    style={{ backgroundColor: stage.headerBg, color: stage.headerText }}
+                  >
+                    <h3 className="font-semibold text-sm">{stage.label}</h3>
+                    <span
+                      className="text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center"
+                      style={{
+                        backgroundColor: isResolved ? '#ffffff' : stage.headerText === '#ffffff' ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.15)',
+                        color: isResolved ? stage.headerBg : stage.headerText,
+                      }}
                     >
-                      <div className="flex justify-between items-start mb-2">
-                        <div>
-                          <p className="font-medium text-sm">{p.ownerName}</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">{p.plotNumber}</p>
+                      {stageProperties[stage.id].length}
+                    </span>
+                  </div>
+                  <div className={`rounded-b-lg shadow p-3 space-y-3 max-h-[28rem] overflow-y-auto ${isResolved ? 'bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900' : 'bg-white dark:bg-gray-800'}`}>
+                    {stageProperties[stage.id].length === 0 && (
+                      <p className="text-xs text-gray-400 dark:text-gray-500 text-center py-4">No cases</p>
+                    )}
+                    {stageProperties[stage.id].map((p) => {
+                      const penalty = calculatePenalty(p.annualTaxDue, p.taxDueDate);
+                      const nextAction = getNextAction(p.enforcementStage, penalty.daysOverdue);
+
+                      if (isResolved) {
+                        const resolvedDate = p.lastPaymentDate
+                          ? formatDate(new Date(p.lastPaymentDate), 'MMM d, yyyy')
+                          : '—';
+                        const amountOwed = p.annualTaxDue + (p.principalOwed || 0);
+                        return (
+                          <div
+                            key={p.id}
+                            className="bg-white/80 dark:bg-gray-800/80 rounded-lg p-3 opacity-90"
+                            style={{ borderLeft: `4px solid ${stage.border}` }}
+                          >
+                            <div className="mb-2">
+                              <p className="font-medium text-sm text-gray-800 dark:text-gray-200">{p.ownerName}</p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">{p.plotNumber}</p>
+                            </div>
+                            <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">
+                              Settled: {formatCurrency(amountOwed > 0 ? amountOwed : p.annualTaxDue)}
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Resolved: {resolvedDate}</p>
+                            <span className="inline-block text-xs font-bold px-2 py-0.5 rounded bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 mb-2">
+                              RESOLVED
+                            </span>
+                            <div className="flex justify-end mt-2">
+                              <button
+                                onClick={() => onSelectProperty(p)}
+                                className="text-xs bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-3 py-1 rounded hover:bg-gray-300 dark:hover:bg-gray-600"
+                              >
+                                View
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div
+                          key={p.id}
+                          className="bg-gray-50 dark:bg-gray-750 rounded-lg p-3"
+                          style={{ borderLeft: `4px solid ${stage.border}` }}
+                        >
+                          <div className="mb-2">
+                            <p className="font-medium text-sm">{p.ownerName}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">{p.plotNumber}</p>
+                          </div>
+                          <p className="text-sm font-bold text-red-600 mb-1">{formatCurrency(penalty.totalOwed)}</p>
+                          <div className="flex justify-between items-center text-xs mb-3">
+                            {getDaysOverdueDisplay(penalty.daysOverdue)}
+                          </div>
+                          <div className="flex items-center justify-end gap-2">
+                            {nextAction !== 'Monitor' && (
+                              <button
+                                disabled={isActionDisabled}
+                                className={`text-xs px-2 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed ${getPipelineActionStyle(nextAction)}`}
+                                title={isActionDisabled ? 'Contact Admin to perform actions' : nextAction}
+                              >
+                                {nextAction}
+                              </button>
+                            )}
+                            <button
+                              onClick={() => onSelectProperty(p)}
+                              className="text-xs bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-200 px-2 py-1 rounded hover:bg-gray-300 dark:hover:bg-gray-500"
+                            >
+                              View
+                            </button>
+                            <button
+                              onClick={() => advanceStage(p)}
+                              disabled={isActionDisabled}
+                              className="text-xs bg-[#C8102E] text-white px-2 py-1 rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="Move to next stage"
+                            >
+                              <ArrowRight size={14} />
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                      <p className="text-sm font-bold text-red-600 mb-1">{formatCurrency(penalty.totalOwed)}</p>
-                      <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-2">
-                        <span>{penalty.daysOverdue} days overdue</span>
-                        <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs">{getNextAction(p.enforcementStage, penalty.daysOverdue)}</span>
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => advanceStage(p)}
-                          disabled={isActionDisabled || stage.id === 'resolved'}
-                          className="flex-1 text-xs bg-[#C8102E] text-white px-2 py-1 rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                          title={isActionDisabled ? 'Contact Admin to perform actions' : ''}
-                        >
-                          <ArrowRight size={14} className="inline" />
-                        </button>
-                        <button
-                          onClick={() => onSelectProperty(p)}
-                          className="flex-1 text-xs bg-gray-200 px-2 py-1 rounded hover:bg-gray-300"
-                        >
-                          View
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>

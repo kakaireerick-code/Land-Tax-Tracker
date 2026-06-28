@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <rect width="192" height="192" fill="#111111"/>
+  <rect x="0" y="0" width="192" height="32" fill="#1a1a1a"/>
+  <rect x="0" y="32" width="192" height="32" fill="#FCDD09"/>
+  <rect x="0" y="64" width="192" height="32" fill="#C8102E"/>
+  <rect x="0" y="96" width="192" height="32" fill="#1a1a1a"/>
+  <rect x="0" y="128" width="192" height="32" fill="#FCDD09"/>
+  <rect x="0" y="160" width="192" height="32" fill="#C8102E"/>
+  <circle cx="96" cy="96" r="36" fill="white"/>
+  <text x="96" y="88" textAnchor="middle" fontSize="16" 
+        fontWeight="bold" fill="#C8102E" fontFamily="Arial">ULTT</text>
+  <text x="96" y="108" textAnchor="middle" fontSize="10" 
+        fill="#1a1a1a" fontFamily="Arial">OFFICIAL</text>
+</svg>
