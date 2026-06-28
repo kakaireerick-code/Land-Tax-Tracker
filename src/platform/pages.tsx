@@ -6,7 +6,7 @@ import { formatDate, formatCurrency, calculatePenalty, downloadTextFile, parseCS
 import type {
   AppUser, UserRole, PlatformSettings, RoleChangeLog, AutoEscalationRule,
 } from '../types/platform';
-import { DISTRICT_NAMES, isKnownDistrict } from '../data/districts';
+import { isKnownDistrict } from '../data/districts';
 import { FlatDistrictSelect } from '../components/DistrictSelect';
 import { ROLE_LABELS } from '../types/platform';
 import type { Property } from '../property';

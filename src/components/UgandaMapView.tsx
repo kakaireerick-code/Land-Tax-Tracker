@@ -151,6 +151,7 @@ export function UgandaMapView({
   properties: Property[];
   onSelectProperty: (p: Property) => void;
 }) {
+  const [mapReady, setMapReady] = useState(false);
   const [selectedRegion, setSelectedRegion] = useState<RegionKey | null>(null);
   const [flyTarget, setFlyTarget] = useState<
     { bounds: LatLngBoundsExpression } | { center: [number, number]; zoom: number } | null
@@ -158,6 +159,11 @@ export function UgandaMapView({
   const [resetKey, setResetKey] = useState(0);
   const [showDistrictSummary, setShowDistrictSummary] = useState(true);
   const [selectedDistrict, setSelectedDistrict] = useState<string | null>(null);
+
+  useEffect(() => {
+    setMapReady(true);
+    return () => setMapReady(false);
+  }, []);
 
   const mappable = useMemo(
     () => properties.filter((p) => p.lat !== 0 && p.lng !== 0),
@@ -259,7 +265,13 @@ export function UgandaMapView({
 
       <div className="flex flex-1 gap-4 min-h-0">
         <div className="flex-1 relative rounded-xl overflow-hidden shadow-lg border border-gray-200 dark:border-gray-700 min-w-0">
+          {!mapReady ? (
+            <div className="h-full w-full flex items-center justify-center bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-sm">
+              Loading map…
+            </div>
+          ) : (
           <MapContainer
+            key="uganda-interactive-map"
             center={UGANDA_CENTER}
             zoom={UGANDA_ZOOM}
             minZoom={6}
@@ -362,6 +374,7 @@ export function UgandaMapView({
                 );
               })}
           </MapContainer>
+          )}
 
           <div className="absolute bottom-3 left-3 z-[1000] bg-white/95 dark:bg-gray-900/95 backdrop-blur rounded-lg shadow-md px-3 py-2 text-xs space-y-1.5 pointer-events-none">
             <p className="font-semibold text-gray-800 dark:text-gray-100">Property status</p>

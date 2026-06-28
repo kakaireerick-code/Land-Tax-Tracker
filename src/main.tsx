@@ -20,13 +20,9 @@ function AppRoot() {
     let cancelled = false;
     let fadeTimer = 0;
     let hideTimer = 0;
-    let fallbackTimer = 0;
-    let finished = false;
 
     const dismiss = () => {
-      if (cancelled || finished) return;
-      finished = true;
-
+      if (cancelled) return;
       const remaining = Math.max(0, MIN_LOAD_MS - (performance.now() - startedRef.current));
       fadeTimer = window.setTimeout(() => {
         if (cancelled) return;
@@ -37,19 +33,11 @@ function AppRoot() {
       }, remaining);
     };
 
-    // DOMContentLoaded is enough — do not wait for every subresource (images, tiles, etc.)
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', dismiss, { once: true });
-    } else {
-      dismiss();
-    }
-
-    // Never block the app indefinitely if an event is missed (e.g. StrictMode remount)
-    fallbackTimer = window.setTimeout(dismiss, MAX_LOAD_MS);
+    dismiss();
+    const fallbackTimer = window.setTimeout(dismiss, MAX_LOAD_MS);
 
     return () => {
       cancelled = true;
-      document.removeEventListener('DOMContentLoaded', dismiss);
       window.clearTimeout(fadeTimer);
       window.clearTimeout(hideTimer);
       window.clearTimeout(fallbackTimer);
@@ -59,17 +47,17 @@ function AppRoot() {
   return (
     <>
       {loading && <LoadingScreen fading={fading} />}
-      <div
-        style={{
-          visibility: loading ? 'hidden' : 'visible',
-          minHeight: '100vh',
-        }}
-        aria-hidden={loading}
-      >
-        <ErrorBoundary>
+      <ErrorBoundary>
+        <div
+          style={{
+            visibility: loading ? 'hidden' : 'visible',
+            minHeight: '100vh',
+          }}
+          aria-hidden={loading}
+        >
           <App />
-        </ErrorBoundary>
-      </div>
+        </div>
+      </ErrorBoundary>
     </>
   );
 }
@@ -81,23 +69,30 @@ createRoot(document.getElementById('root')!).render(
 );
 
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js', { scope: '/' })
-      .then((registration) => {
-        console.log('SW registered successfully');
-        registration.addEventListener('updatefound', () => {
-          const newWorker = registration.installing;
-          if (!newWorker) return;
-          newWorker.addEventListener('statechange', () => {
-            if (newWorker.state === 'installed' &&
-                navigator.serviceWorker.controller) {
-              console.log('New version available');
-            }
+  if (import.meta.env.DEV) {
+    // Dev HMR breaks when a service worker caches module responses
+    void navigator.serviceWorker.getRegistrations().then((regs) => {
+      regs.forEach((r) => void r.unregister());
+    });
+  } else {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js', { scope: '/' })
+        .then((registration) => {
+          console.log('SW registered successfully');
+          registration.addEventListener('updatefound', () => {
+            const newWorker = registration.installing;
+            if (!newWorker) return;
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' &&
+                  navigator.serviceWorker.controller) {
+                console.log('New version available');
+              }
+            });
           });
+        })
+        .catch((error) => {
+          console.log('SW registration failed:', error);
         });
-      })
-      .catch((error) => {
-        console.log('SW registration failed:', error);
-      });
-  });
+    });
+  }
 }
