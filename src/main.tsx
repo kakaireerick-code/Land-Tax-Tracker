@@ -5,42 +5,55 @@ import { ErrorBoundary } from './components/ErrorBoundary.tsx';
 import { hideHtmlSplash, LoadingScreen } from './components/LoadingScreen.tsx';
 import './index.css';
 
-const MIN_LOAD_MS = 2000;
-const FADE_MS = 500;
-let loadTimerStarted = false;
+const MIN_LOAD_MS = 1600;
+const FADE_MS = 450;
+const MAX_LOAD_MS = 6000;
 
 function AppRoot() {
   const [loading, setLoading] = useState(true);
   const [fading, setFading] = useState(false);
   const startedRef = useRef(performance.now());
-  const doneRef = useRef(false);
 
   useLayoutEffect(() => {
     hideHtmlSplash();
-  }, []);
 
-  useLayoutEffect(() => {
-    if (loadTimerStarted) return;
-    loadTimerStarted = true;
+    let cancelled = false;
+    let fadeTimer = 0;
+    let hideTimer = 0;
+    let fallbackTimer = 0;
+    let finished = false;
 
-    if (doneRef.current) return;
+    const dismiss = () => {
+      if (cancelled || finished) return;
+      finished = true;
 
-    const finish = () => {
-      if (doneRef.current) return;
-      doneRef.current = true;
       const remaining = Math.max(0, MIN_LOAD_MS - (performance.now() - startedRef.current));
-      window.setTimeout(() => {
+      fadeTimer = window.setTimeout(() => {
+        if (cancelled) return;
         setFading(true);
-        window.setTimeout(() => setLoading(false), FADE_MS);
+        hideTimer = window.setTimeout(() => {
+          if (!cancelled) setLoading(false);
+        }, FADE_MS);
       }, remaining);
     };
 
-    if (document.readyState === 'complete') {
-      finish();
+    // DOMContentLoaded is enough — do not wait for every subresource (images, tiles, etc.)
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', dismiss, { once: true });
     } else {
-      window.addEventListener('load', finish, { once: true });
-      return () => window.removeEventListener('load', finish);
+      dismiss();
     }
+
+    // Never block the app indefinitely if an event is missed (e.g. StrictMode remount)
+    fallbackTimer = window.setTimeout(dismiss, MAX_LOAD_MS);
+
+    return () => {
+      cancelled = true;
+      document.removeEventListener('DOMContentLoaded', dismiss);
+      window.clearTimeout(fadeTimer);
+      window.clearTimeout(hideTimer);
+      window.clearTimeout(fallbackTimer);
+    };
   }, []);
 
   return (

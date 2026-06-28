@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, Suspense, lazy } from 'react';
 import {
   LayoutDashboard,
   Building2,
@@ -52,8 +52,12 @@ import {
   AutoEscalationPage, HelpPage, RentInterceptionModal, getNextAction,
 } from './platform/extras';
 import { createDemoProperties } from './data/demo';
-import { UGANDA_DISTRICT_COUNT, DISTRICT_REGION_MAP, REGION_DESCRIPTIONS } from './data/districts';
+import { UGANDA_DISTRICT_COUNT } from './data/districts';
 import { FlatDistrictSelect, GroupedDistrictSelect } from './components/DistrictSelect';
+
+const UgandaMapView = lazy(() =>
+  import('./components/UgandaMapView').then((m) => ({ default: m.UgandaMapView })),
+);
 import { loadJson, saveJson } from './lib/storage';
 import type { AppUser, UserRole, PlatformSettings, EscalationLogEntry, DemoUsageLog } from './types/platform';
 import { ROLE_LABELS } from './types/platform';
@@ -660,13 +664,21 @@ export default function App() {
             <InterestProjectionPage properties={filteredProperties} />
           )}
           {currentPage === 'map' && (
-            <UgandaMapPage
-              properties={filteredProperties}
-              onSelectProperty={(prop) => {
-                setSelectedProperty(prop);
-                setShowDetailPanel(true);
-              }}
-            />
+            <Suspense
+              fallback={
+                <div className="flex items-center justify-center h-96 text-gray-500 dark:text-gray-400">
+                  Loading map…
+                </div>
+              }
+            >
+              <UgandaMapView
+                properties={filteredProperties}
+                onSelectProperty={(prop) => {
+                  setSelectedProperty(prop);
+                  setShowDetailPanel(true);
+                }}
+              />
+            </Suspense>
           )}
           {currentPage === 'pipeline' && (
             <EnforcementPipelinePage
@@ -1359,212 +1371,6 @@ function PenaltyCalculatorPage({
         </div>
       </div>
       {demoMode && <p className="text-sm text-gray-500 dark:text-gray-400 italic">Note: Data shown is fictional training data only. Not real records.</p>}
-    </div>
-  );
-}
-
-// Uganda Map Page
-function UgandaMapPage({
-  properties,
-  onSelectProperty,
-}: {
-  properties: Property[];
-  onSelectProperty: (p: Property) => void;
-}) {
-  const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
-  const [hoveredRegion, setHoveredRegion] = useState<string | null>(null);
-
-  const regions = useMemo(() => ({
-    central: {
-      name: 'Central Region',
-      region: 'Central' as const,
-      description: REGION_DESCRIPTIONS.Central,
-      path: 'M150,280 L180,250 L220,260 L240,290 L230,330 L190,340 L160,310 Z',
-      centroid: { x: 195, y: 295 },
-    },
-    northern: {
-      name: 'Northern Region',
-      region: 'Northern' as const,
-      description: REGION_DESCRIPTIONS.Northern,
-      path: 'M150,100 L190,80 L230,90 L250,130 L240,170 L200,190 L160,180 L140,140 Z',
-      centroid: { x: 195, y: 135 },
-    },
-    eastern: {
-      name: 'Eastern Region',
-      region: 'Eastern' as const,
-      description: REGION_DESCRIPTIONS.Eastern,
-      path: 'M250,200 L290,180 L330,200 L340,250 L320,290 L280,300 L250,270 Z',
-      centroid: { x: 295, y: 245 },
-    },
-    western: {
-      name: 'Western Region',
-      region: 'Western' as const,
-      description: REGION_DESCRIPTIONS.Western,
-      path: 'M60,250 L100,220 L140,240 L150,290 L130,340 L90,350 L60,310 Z',
-      centroid: { x: 105, y: 285 },
-    },
-  }), []);
-
-  const regionStats = useMemo(() => {
-    const stats: { [key: string]: { properties: Property[]; delinquent: number; totalOwed: number; color: string } } = {};
-    Object.entries(regions).forEach(([key, region]) => {
-      const regionProperties = properties.filter((p) => DISTRICT_REGION_MAP[p.district] === region.region);
-      const delinquent = regionProperties.filter(p => p.status === 'delinquent');
-      let totalOwed = 0;
-      delinquent.forEach(p => {
-        const penalty = calculatePenalty(p.annualTaxDue, p.taxDueDate);
-        totalOwed += penalty.totalOwed;
-      });
-
-      const delinquentCount = delinquent.length;
-      let color = '#22c55e';
-      if (delinquentCount >= 9) color = '#ef4444';
-      else if (delinquentCount >= 6) color = '#f97316';
-      else if (delinquentCount >= 3) color = '#eab308';
-
-      stats[key] = {
-        properties: regionProperties,
-        delinquent: delinquentCount,
-        totalOwed,
-        color,
-      };
-    });
-    return stats;
-  }, [properties, regions]);
-
-  const selectedRegionData = selectedRegion ? {
-    ...regions[selectedRegion as keyof typeof regions],
-    stats: regionStats[selectedRegion],
-  } : null;
-
-  return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-[#1a1a1a] dark:text-white">Uganda Map</h1>
-
-      <div className="grid lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-          <svg viewBox="0 0 400 400" className="w-full max-w-lg mx-auto">
-            <rect x="0" y="0" width="400" height="400" className="fill-gray-100 dark:fill-gray-700" />
-
-            {Object.entries(regions).map(([key, region]) => (
-              <g key={key}>
-                <path
-                  d={region.path}
-                  fill={regionStats[key]?.color || '#22c55e'}
-                  stroke="#fff"
-                  strokeWidth="2"
-                  className="cursor-pointer transition-all hover:opacity-80"
-                  onClick={() => setSelectedRegion(key)}
-                  onMouseEnter={() => setHoveredRegion(key)}
-                  onMouseLeave={() => setHoveredRegion(null)}
-                />
-                <text
-                  x={region.centroid.x}
-                  y={region.centroid.y}
-                  textAnchor="middle"
-                  fontSize="10"
-                  fill="#fff"
-                  fontWeight="bold"
-                  className="pointer-events-none"
-                >
-                  {region.name.split(' ')[0]}
-                </text>
-              </g>
-            ))}
-
-            {hoveredRegion && (
-              <g>
-                <rect
-                  x={regions[hoveredRegion as keyof typeof regions].centroid.x - 50}
-                  y={regions[hoveredRegion as keyof typeof regions].centroid.y - 40}
-                  width="100"
-                  height="25"
-                  className="fill-gray-900 dark:fill-gray-800"
-                  rx="4"
-                />
-                <text
-                  x={regions[hoveredRegion as keyof typeof regions].centroid.x}
-                  y={regions[hoveredRegion as keyof typeof regions].centroid.y - 25}
-                  textAnchor="middle"
-                  fontSize="10"
-                  fill="#fff"
-                >
-                  {regionStats[hoveredRegion]?.delinquent || 0} delinquent
-                </text>
-              </g>
-            )}
-          </svg>
-
-          <div className="flex justify-center gap-4 mt-4 flex-wrap">
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded" style={{ backgroundColor: '#22c55e' }}></div>
-              <span className="text-xs">0-2 delinquent</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded" style={{ backgroundColor: '#eab308' }}></div>
-              <span className="text-xs">3-5 delinquent</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded" style={{ backgroundColor: '#f97316' }}></div>
-              <span className="text-xs">6-8 delinquent</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded" style={{ backgroundColor: '#ef4444' }}></div>
-              <span className="text-xs">9+ delinquent</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-          {selectedRegionData ? (
-            <div className="space-y-4">
-              <h3 className="font-bold text-lg">{selectedRegionData.name}</h3>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Coverage</span>
-                  <span className="text-right text-sm">{selectedRegionData.description}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Total Properties</span>
-                  <span className="font-bold text-gray-900 dark:text-white">{selectedRegionData.stats.properties.length}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Delinquent Count</span>
-                  <span className="font-bold text-red-600">{selectedRegionData.stats.delinquent}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Total Owed</span>
-                  <span className="font-bold text-red-600">{formatCurrency(selectedRegionData.stats.totalOwed)}</span>
-                </div>
-              </div>
-
-              <h4 className="font-semibold mt-4">Top Properties by Debt</h4>
-              <div className="space-y-2">
-                {selectedRegionData.stats.properties
-                  .filter(p => p.status !== 'paid')
-                  .map(p => ({ ...p, penalty: calculatePenalty(p.annualTaxDue, p.taxDueDate) }))
-                  .sort((a, b) => b.penalty.totalOwed - a.penalty.totalOwed)
-                  .slice(0, 3)
-                  .map((p) => (
-                    <button
-                      key={p.id}
-                      onClick={() => onSelectProperty(p)}
-                      className="w-full flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-750 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
-                    >
-                      <span className="text-sm">{p.ownerName}</span>
-                      <span className="text-sm font-bold text-red-600">{formatCurrency(p.penalty.totalOwed)}</span>
-                    </button>
-                  ))}
-              </div>
-            </div>
-          ) : (
-            <div className="text-center text-gray-500 dark:text-gray-400 py-8">
-              <Map size={48} className="mx-auto mb-4 text-gray-300" />
-              <p>Click a region on the map to view details</p>
-            </div>
-          )}
-        </div>
-      </div>
     </div>
   );
 }

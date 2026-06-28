@@ -416,3 +416,28 @@
   padding: 0 1.5rem;
   margin: 0;
 }
+
+/* Interactive Uganda map (Leaflet) */
+.leaflet-container {
+  font-family: inherit;
+  z-index: 0;
+}
+
+.dark .leaflet-container {
+  background: #111827;
+}
+
+.leaflet-control-layers,
+.leaflet-control-zoom {
+  border: none !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+}
+
+.leaflet-popup-content-wrapper {
+  border-radius: 8px;
+}
+
+.leaflet-popup-content {
+  margin: 10px 12px;
+  line-height: 1.4;
+}

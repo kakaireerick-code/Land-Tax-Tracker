@@ -16,11 +16,6 @@ type LoadingScreenProps = {
 export function LoadingScreen({ fading = false }: LoadingScreenProps) {
   const [progress, setProgress] = useState(8);
   const [statusIndex, setStatusIndex] = useState(0);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   useEffect(() => {
     const progressTimer = window.setInterval(() => {
@@ -44,8 +39,6 @@ export function LoadingScreen({ fading = false }: LoadingScreenProps) {
   useEffect(() => {
     if (fading) setProgress(100);
   }, [fading]);
-
-  if (!mounted) return null;
 
   return createPortal(
     <div
