@@ -1,15 +1,37 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Download, Plus, Trash2, X, Check, AlertTriangle, MessageCircle, Copy, Mail } from 'lucide-react';
+import { Download, Plus, Trash2, X, Check, AlertTriangle, MessageCircle, Copy, Mail, Pin, Lock, Users } from 'lucide-react';
 import { formatDate, formatCurrency, calculatePenalty, downloadTextFile } from '../lib/helpers';
 import { loadJson, saveJson } from '../lib/storage';
-import type { AppUser, PlatformSettings, DemoUsageLog, ChatMessage, SharedDocument, Announcement, BookedMeeting, ShareHistoryItem, AutoEscalationRule, EscalationLogEntry } from '../types/platform';
+import type { AppUser, PlatformSettings, DemoUsageLog, ChatMessage, ChatReactionEmoji, PrivateChatRoom, SharedDocument, Announcement, BookedMeeting, ShareHistoryItem, AutoEscalationRule, EscalationLogEntry } from '../types/platform';
 import { DISTRICTS } from '../types/platform';
 import { UgandaCoatOfArms, UGANDA_COAT_OF_ARMS_TEXT } from '../components/UgandaCoatOfArms';
 import type { Property } from '../property';
 
+const CHAT_REACTIONS: ChatReactionEmoji[] = ['👍', '❤️', '😂', '⚠️', '✅'];
+
+function normalizeChatMessage(m: ChatMessage): ChatMessage {
+  return {
+    ...m,
+    pinned: m.pinned ?? false,
+    reactions: m.reactions ?? [],
+  };
+}
+
 export function MeetingRoomPage({ currentUser, users, showToast, isSuperAdmin }: { currentUser: AppUser; users: AppUser[]; showToast: (m: string, t?: 'success' | 'error') => void; isSuperAdmin: boolean }) {
   const [tab, setTab] = useState<'chat' | 'docs' | 'announcements' | 'notes' | 'booking'>('chat');
-  const [messages, setMessages] = useState<ChatMessage[]>(() => loadJson('ultt_meeting_chat', []));
+  const [messages, setMessages] = useState<ChatMessage[]>(() =>
+    (loadJson('ultt_meeting_chat', []) as ChatMessage[]).map(normalizeChatMessage)
+  );
+  const [privateRooms, setPrivateRooms] = useState<PrivateChatRoom[]>(() =>
+    (loadJson('ultt_private_chat_rooms', []) as PrivateChatRoom[]).map((r) => ({
+      ...r,
+      messages: (r.messages ?? []).map(normalizeChatMessage),
+    }))
+  );
+  const [activeChatId, setActiveChatId] = useState<'public' | string>('public');
+  const [showCreateRoom, setShowCreateRoom] = useState(false);
+  const [newRoomName, setNewRoomName] = useState('');
+  const [newRoomMembers, setNewRoomMembers] = useState<string[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [docs, setDocs] = useState<SharedDocument[]>(() => loadJson('ultt_shared_docs', []));
   const [announcements, setAnnouncements] = useState<Announcement[]>(() => loadJson('ultt_meeting_announcements', []));
@@ -42,20 +64,195 @@ export function MeetingRoomPage({ currentUser, users, showToast, isSuperAdmin }:
   };
 
   useEffect(() => { saveJson('ultt_meeting_chat', messages.slice(-50)); }, [messages]);
+  useEffect(() => { saveJson('ultt_private_chat_rooms', privateRooms); }, [privateRooms]);
+
+  const myPrivateRooms = useMemo(
+    () => privateRooms.filter((r) => r.members.includes(currentUser.fullName)),
+    [privateRooms, currentUser.fullName],
+  );
+
+  const activeMessages = useMemo(() => {
+    if (activeChatId === 'public') return messages;
+    return myPrivateRooms.find((r) => r.id === activeChatId)?.messages ?? [];
+  }, [activeChatId, messages, myPrivateRooms]);
+
+  const { pinnedMessages, regularMessages } = useMemo(() => {
+    const normalized = activeMessages.map(normalizeChatMessage);
+    return {
+      pinnedMessages: normalized.filter((m) => m.pinned),
+      regularMessages: normalized.filter((m) => !m.pinned),
+    };
+  }, [activeMessages]);
+
+  const canPinMessages = isSuperAdmin || currentUser.role === 'admin';
+
+  const updateActiveMessages = (updater: (prev: ChatMessage[]) => ChatMessage[]) => {
+    if (activeChatId === 'public') {
+      setMessages((prev) => updater(prev).slice(-50));
+    } else {
+      setPrivateRooms((rooms) =>
+        rooms.map((r) =>
+          r.id === activeChatId
+            ? { ...r, messages: updater(r.messages).slice(-50) }
+            : r,
+        ),
+      );
+    }
+  };
 
   useEffect(() => {
     if (!userScrolledUp && chatRef.current) {
       chatRef.current.scrollTop = chatRef.current.scrollHeight;
     }
-  }, [messages, userScrolledUp]);
+  }, [activeMessages, userScrolledUp]);
 
-  useEffect(() => { const i = setInterval(() => { setMessages(loadJson('ultt_meeting_chat', [])); }, 2000); return () => clearInterval(i); }, []);
+  useEffect(() => {
+    const i = setInterval(() => {
+      setMessages((loadJson('ultt_meeting_chat', []) as ChatMessage[]).map(normalizeChatMessage));
+      setPrivateRooms(
+        (loadJson('ultt_private_chat_rooms', []) as PrivateChatRoom[]).map((r) => ({
+          ...r,
+          messages: (r.messages ?? []).map(normalizeChatMessage),
+        })),
+      );
+    }, 2000);
+    return () => clearInterval(i);
+  }, []);
   useEffect(() => { const i = setInterval(() => { saveJson('ultt_meeting_notes', notes); setLastSaved(formatDate(new Date(), 'MMM d, HH:mm')); }, 30000); return () => clearInterval(i); }, [notes]);
 
   const sendChat = () => {
     if (!chatInput.trim()) return;
-    setMessages((prev) => [...prev.slice(-49), { id: Date.now(), sender: currentUser.fullName, message: chatInput.trim(), timestamp: formatDate(new Date(), 'MMM d, HH:mm') }]);
+    const msg: ChatMessage = {
+      id: Date.now(),
+      sender: currentUser.fullName,
+      message: chatInput.trim(),
+      timestamp: formatDate(new Date(), 'MMM d, HH:mm'),
+      reactions: [],
+      pinned: false,
+    };
+    updateActiveMessages((prev) => [...prev, msg]);
     setChatInput('');
+  };
+
+  const togglePin = (messageId: number) => {
+    if (!canPinMessages) {
+      showToast('Only admins can pin messages', 'error');
+      return;
+    }
+    updateActiveMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId
+          ? {
+              ...m,
+              pinned: !m.pinned,
+              pinnedBy: !m.pinned ? currentUser.fullName : undefined,
+            }
+          : m,
+      ),
+    );
+    showToast('Message pin updated');
+  };
+
+  const toggleReaction = (messageId: number, emoji: ChatReactionEmoji) => {
+    updateActiveMessages((prev) =>
+      prev.map((m) => {
+        if (m.id !== messageId) return m;
+        const reactions = [...(m.reactions ?? [])];
+        const idx = reactions.findIndex((r) => r.emoji === emoji);
+        if (idx >= 0) {
+          const users = reactions[idx].users;
+          if (users.includes(currentUser.fullName)) {
+            const next = users.filter((u) => u !== currentUser.fullName);
+            if (next.length === 0) reactions.splice(idx, 1);
+            else reactions[idx] = { emoji, users: next };
+          } else {
+            reactions[idx] = { emoji, users: [...users, currentUser.fullName] };
+          }
+        } else {
+          reactions.push({ emoji, users: [currentUser.fullName] });
+        }
+        return { ...m, reactions };
+      }),
+    );
+  };
+
+  const createPrivateRoom = () => {
+    if (!newRoomName.trim()) {
+      showToast('Enter a room name', 'error');
+      return;
+    }
+    if (newRoomMembers.length === 0) {
+      showToast('Select at least one member', 'error');
+      return;
+    }
+    const members = [...new Set([currentUser.fullName, ...newRoomMembers])];
+    const room: PrivateChatRoom = {
+      id: `room-${Date.now()}`,
+      name: newRoomName.trim(),
+      createdBy: currentUser.fullName,
+      members,
+      messages: [],
+      createdAt: formatDate(new Date(), 'yyyy-MM-dd'),
+    };
+    setPrivateRooms((prev) => [...prev, room]);
+    setActiveChatId(room.id);
+    setNewRoomName('');
+    setNewRoomMembers([]);
+    setShowCreateRoom(false);
+    showToast(`Private room "${room.name}" created`);
+  };
+
+  const renderChatMessage = (m: ChatMessage) => {
+    const isOwn = m.sender === currentUser.fullName;
+    return (
+      <div key={m.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
+        <div
+          className={`max-w-[85%] p-2 rounded-lg text-sm ${
+            m.pinned ? 'ring-2 ring-[#FCDD09] ring-offset-1 dark:ring-offset-gray-800' : ''
+          } ${isOwn ? 'bg-[#C8102E] text-white' : 'bg-gray-800 text-white'}`}
+        >
+          <div className="flex items-start justify-between gap-2 mb-1">
+            <p className="text-xs opacity-70">
+              {m.pinned && <Pin size={10} className="inline mr-1 text-[#FCDD09]" />}
+              {m.sender}
+              <span className="inline-block w-2 h-2 bg-green-400 rounded-full ml-1" />
+              {' '}{m.timestamp}
+            </p>
+            {canPinMessages && (
+              <button
+                type="button"
+                onClick={() => togglePin(m.id)}
+                className={`shrink-0 p-0.5 rounded hover:bg-white/20 ${m.pinned ? 'text-[#FCDD09]' : 'opacity-60'}`}
+                title={m.pinned ? 'Unpin message' : 'Pin message'}
+              >
+                <Pin size={12} />
+              </button>
+            )}
+          </div>
+          <p className="whitespace-pre-wrap break-words">{m.message}</p>
+          <div className="flex flex-wrap items-center gap-1 mt-2 pt-1 border-t border-white/10">
+            {CHAT_REACTIONS.map((emoji) => {
+              const reaction = m.reactions?.find((r) => r.emoji === emoji);
+              const count = reaction?.users.length ?? 0;
+              const reacted = reaction?.users.includes(currentUser.fullName);
+              return (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={() => toggleReaction(m.id, emoji)}
+                  className={`text-xs px-1.5 py-0.5 rounded-full transition-colors ${
+                    reacted ? 'bg-white/25 ring-1 ring-white/40' : 'hover:bg-white/15 opacity-80'
+                  }`}
+                  title={reaction ? reaction.users.join(', ') : `React with ${emoji}`}
+                >
+                  {emoji}{count > 0 ? ` ${count}` : ''}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const uploadDoc = (file: File) => {
@@ -121,19 +318,75 @@ export function MeetingRoomPage({ currentUser, users, showToast, isSuperAdmin }:
       >
         {tab === 'chat' && (
           <>
+            {/* Room list */}
+            <div
+              style={{ width: '168px', minWidth: '168px' }}
+              className="bg-white dark:bg-gray-800 rounded-lg shadow flex flex-col overflow-hidden shrink-0"
+            >
+              <div className="p-2 border-b border-gray-200 dark:border-gray-700 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                Chat Rooms
+              </div>
+              <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                <button
+                  type="button"
+                  onClick={() => setActiveChatId('public')}
+                  className={`w-full text-left px-2 py-2 rounded text-sm flex items-center gap-2 ${
+                    activeChatId === 'public'
+                      ? 'bg-[#C8102E] text-white'
+                      : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200'
+                  }`}
+                >
+                  <Users size={14} className="shrink-0" />
+                  <span className="truncate">Public Admin</span>
+                </button>
+                {myPrivateRooms.map((room) => (
+                  <button
+                    key={room.id}
+                    type="button"
+                    onClick={() => setActiveChatId(room.id)}
+                    className={`w-full text-left px-2 py-2 rounded text-sm flex items-center gap-2 ${
+                      activeChatId === room.id
+                        ? 'bg-[#C8102E] text-white'
+                        : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200'
+                    }`}
+                  >
+                    <Lock size={14} className="shrink-0" />
+                    <span className="truncate">{room.name}</span>
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCreateRoom(true)}
+                className="m-2 text-xs bg-gray-800 dark:bg-gray-700 text-white py-2 px-2 rounded flex items-center justify-center gap-1 hover:bg-gray-700"
+              >
+                <Plus size={14} /> Private Room
+              </button>
+            </div>
+
+            {/* Chat panel */}
             <div
               style={{
-                width: '40%',
-                minWidth: '280px',
+                width: '36%',
+                minWidth: '260px',
                 display: 'flex',
                 flexDirection: 'column',
                 overflow: 'hidden',
               }}
               className="bg-white dark:bg-gray-800 rounded-lg shadow"
             >
-              <div className="p-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-900 dark:text-white shrink-0">
-                Admin Chat Room
+              <div className="p-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-900 dark:text-white shrink-0 flex items-center gap-2">
+                {activeChatId === 'public' ? (
+                  <><Users size={16} /> Admin Chat Room</>
+                ) : (
+                  <><Lock size={16} /> {myPrivateRooms.find((r) => r.id === activeChatId)?.name ?? 'Private Room'}</>
+                )}
               </div>
+              {activeChatId !== 'public' && (
+                <p className="px-3 py-1 text-xs text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-700 shrink-0">
+                  Members: {myPrivateRooms.find((r) => r.id === activeChatId)?.members.join(', ')}
+                </p>
+              )}
               <div className="relative shrink-0">
                 <div
                   ref={chatRef}
@@ -141,14 +394,18 @@ export function MeetingRoomPage({ currentUser, users, showToast, isSuperAdmin }:
                   style={chatContainerStyle}
                   className="p-3 space-y-2"
                 >
-                  {messages.map((m) => (
-                    <div key={m.id} className={`flex ${m.sender === currentUser.fullName ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[80%] p-2 rounded-lg text-sm ${m.sender === currentUser.fullName ? 'bg-[#C8102E] text-white' : 'bg-gray-800 text-white'}`}>
-                        <p className="text-xs opacity-70">{m.sender} <span className="inline-block w-2 h-2 bg-green-400 rounded-full ml-1" /> {m.timestamp}</p>
-                        {m.message}
-                      </div>
+                  {pinnedMessages.length > 0 && (
+                    <div className="mb-3 pb-2 border-b border-[#FCDD09]/40">
+                      <p className="text-xs font-bold text-[#FCDD09] mb-2 flex items-center gap-1">
+                        <Pin size={12} /> Pinned ({pinnedMessages.length})
+                      </p>
+                      <div className="space-y-2">{pinnedMessages.map(renderChatMessage)}</div>
                     </div>
-                  ))}
+                  )}
+                  {regularMessages.length === 0 && pinnedMessages.length === 0 && (
+                    <p className="text-xs text-gray-400 text-center py-8">No messages yet. Start the conversation.</p>
+                  )}
+                  {regularMessages.map(renderChatMessage)}
                 </div>
                 {userScrolledUp && (
                   <button
@@ -180,32 +437,77 @@ export function MeetingRoomPage({ currentUser, users, showToast, isSuperAdmin }:
                 )}
               </div>
               <div className="p-3 border-t border-gray-200 dark:border-gray-700 flex gap-2 shrink-0">
-                <input value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && sendChat()} className="flex-1 border rounded px-3 py-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="Type message..." />
-                <button onClick={sendChat} className="bg-[#C8102E] text-white px-4 rounded">Send</button>
+                <input
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && sendChat()}
+                  className="flex-1 border rounded px-3 py-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  placeholder={activeChatId === 'public' ? 'Message all admins…' : 'Private message…'}
+                />
+                <button onClick={sendChat} className="bg-[#C8102E] text-white px-4 rounded shrink-0">Send</button>
               </div>
             </div>
+
+            {showCreateRoom && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-5 space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                      <Lock size={18} /> New Private Room
+                    </h3>
+                    <button type="button" onClick={() => setShowCreateRoom(false)} className="text-gray-500 hover:text-gray-800">
+                      <X size={20} />
+                    </button>
+                  </div>
+                  <input
+                    value={newRoomName}
+                    onChange={(e) => setNewRoomName(e.target.value)}
+                    placeholder="Room name (e.g. Legal Strategy)"
+                    className="w-full border rounded px-3 py-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  />
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Invite members (you are added automatically)</p>
+                    <select
+                      multiple
+                      value={newRoomMembers}
+                      onChange={(e) => setNewRoomMembers(Array.from(e.target.selectedOptions, (o) => o.value))}
+                      className="w-full border rounded px-3 py-2 h-32 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    >
+                      {users
+                        .filter((u) => u.fullName !== currentUser.fullName && u.status === 'active')
+                        .map((u) => (
+                          <option key={u.id} value={u.fullName}>{u.fullName} ({u.role})</option>
+                        ))}
+                    </select>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={createPrivateRoom}
+                    className="w-full bg-[#C8102E] text-white py-2 rounded font-medium"
+                  >
+                    Create Room
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div
               style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}
               className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-sm text-gray-500 dark:text-gray-400"
             >
-              <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Documents & Announcements</h3>
-              <p>Switch to the <strong>docs</strong> or <strong>announcements</strong> tabs to share files and post updates. Chat messages persist locally for all admins.</p>
+              <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Chat Guide</h3>
+              <ul className="space-y-2 text-xs">
+                <li><strong>Public Admin</strong> — visible to all admins on this device.</li>
+                <li><strong>Private rooms</strong> — only invited members can see messages.</li>
+                <li><Pin size={12} className="inline" /> <strong>Pin</strong> — admins can pin important messages to the top.</li>
+                <li><strong>Reactions</strong> — click 👍 ❤️ 😂 ⚠️ ✅ on any message.</li>
+              </ul>
               {docs.length > 0 && (
                 <div className="mt-4">
                   <p className="font-medium text-gray-700 dark:text-gray-300 mb-2">Recent documents ({docs.length})</p>
                   <ul className="space-y-1">
                     {docs.slice(-5).map((d) => (
                       <li key={d.id} className="text-xs">{d.filename} — {d.uploadedBy}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {announcements.length > 0 && (
-                <div className="mt-4">
-                  <p className="font-medium text-gray-700 dark:text-gray-300 mb-2">Recent announcements ({announcements.length})</p>
-                  <ul className="space-y-1">
-                    {announcements.slice(-3).map((a) => (
-                      <li key={a.id} className="text-xs">{a.title} — {a.priority}</li>
                     ))}
                   </ul>
                 </div>

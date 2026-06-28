@@ -47,11 +47,30 @@ export interface DemoUsageLog {
   action: 'enabled' | 'disabled' | 'reset';
 }
 
+export type ChatReactionEmoji = '👍' | '❤️' | '😂' | '⚠️' | '✅';
+
+export interface ChatMessageReaction {
+  emoji: ChatReactionEmoji;
+  users: string[];
+}
+
 export interface ChatMessage {
   id: number;
   sender: string;
   message: string;
   timestamp: string;
+  pinned?: boolean;
+  pinnedBy?: string;
+  reactions?: ChatMessageReaction[];
+}
+
+export interface PrivateChatRoom {
+  id: string;
+  name: string;
+  createdBy: string;
+  members: string[];
+  messages: ChatMessage[];
+  createdAt: string;
 }
 
 export interface SharedDocument {
