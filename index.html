@@ -7,6 +7,7 @@
     
     <!-- PWA -->
     <link rel="manifest" href="/manifest.json" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <meta name="theme-color" content="#C8102E" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -27,8 +28,231 @@
     <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin" />
     <meta http-equiv="Permissions-Policy" 
       content="camera=(), microphone=(self), geolocation=()" />
+
+    <!-- Critical loader styles — available before JS bundle -->
+    <style>
+      html, body { margin: 0; padding: 0; background: #111111; }
+      #root { min-height: 100vh; background: #111111; }
+
+      @keyframes ultt-splash-pulse {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.05); opacity: 0.85; }
+      }
+      @keyframes ultt-splash-bar {
+        0% { width: 12%; margin-left: 0; }
+        50% { width: 45%; margin-left: 30%; }
+        100% { width: 12%; margin-left: 88%; }
+      }
+      @keyframes ultt-loading-enter {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      @keyframes ultt-loading-exit {
+        from { opacity: 1; }
+        to { opacity: 0; visibility: hidden; }
+      }
+      @keyframes ultt-loading-pulse-ring {
+        0%, 100% { transform: scale(1); opacity: 0.35; }
+        50% { transform: scale(1.08); opacity: 0.15; }
+      }
+      @keyframes ultt-loading-shimmer {
+        0% { background-position: 200% center; }
+        100% { background-position: -200% center; }
+      }
+
+      #ultt-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 99999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: #111111;
+        color: #ffffff;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        transition: opacity 0.4s ease;
+      }
+      #ultt-splash.ultt-splash--hide {
+        opacity: 0;
+        pointer-events: none;
+      }
+      #ultt-splash .ultt-splash-stripes {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 6px;
+        background: linear-gradient(
+          180deg,
+          #1a1a1a 16.66%,
+          #FCDD09 16.66% 33.33%,
+          #C8102E 33.33% 50%,
+          #1a1a1a 50% 66.66%,
+          #FCDD09 66.66% 83.33%,
+          #C8102E 83.33%
+        );
+      }
+      #ultt-splash .ultt-splash-logo {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        background: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        font-size: 1.15rem;
+        color: #C8102E;
+        margin-bottom: 1.25rem;
+        box-shadow: 0 8px 32px rgba(200, 16, 46, 0.35);
+        animation: ultt-splash-pulse 1.6s ease-in-out infinite;
+      }
+      #ultt-splash .ultt-splash-title {
+        font-size: 1.15rem;
+        font-weight: 700;
+        margin: 0 0 0.35rem;
+        letter-spacing: -0.02em;
+      }
+      #ultt-splash .ultt-splash-sub {
+        font-size: 0.8rem;
+        color: #9ca3af;
+        margin: 0 0 1.5rem;
+      }
+      #ultt-splash .ultt-splash-bar-track {
+        width: min(240px, 70vw);
+        height: 4px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 999px;
+        overflow: hidden;
+      }
+      #ultt-splash .ultt-splash-bar-fill {
+        height: 100%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #C8102E, #FCDD09, #C8102E);
+        animation: ultt-splash-bar 1.4s ease-in-out infinite;
+      }
+
+      .ultt-loading-screen {
+        position: fixed;
+        inset: 0;
+        z-index: 99999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: #111111;
+        color: #ffffff;
+        animation: ultt-loading-enter 0.35s ease-out;
+      }
+      .ultt-loading-screen--exit {
+        animation: ultt-loading-exit 0.5s ease-in forwards;
+        pointer-events: none;
+      }
+      .ultt-loading-stripes {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        display: flex;
+        flex-direction: column;
+        height: 6px;
+      }
+      .ultt-loading-stripes span:nth-child(1) { flex: 1; background: #1a1a1a; }
+      .ultt-loading-stripes span:nth-child(2) { flex: 1; background: #FCDD09; }
+      .ultt-loading-stripes span:nth-child(3) { flex: 1; background: #C8102E; }
+      .ultt-loading-stripes span:nth-child(4) { flex: 1; background: #1a1a1a; }
+      .ultt-loading-stripes span:nth-child(5) { flex: 1; background: #FCDD09; }
+      .ultt-loading-stripes span:nth-child(6) { flex: 1; background: #C8102E; }
+      .ultt-loading-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        padding: 2rem;
+        max-width: 22rem;
+      }
+      .ultt-loading-emblem { position: relative; margin-bottom: 1.5rem; }
+      .ultt-loading-flag {
+        position: relative;
+        z-index: 1;
+        border-radius: 8px;
+        box-shadow: 0 8px 32px rgba(200, 16, 46, 0.25);
+      }
+      .ultt-loading-ring {
+        position: absolute;
+        inset: -12px;
+        border: 2px solid #C8102E;
+        border-radius: 12px;
+        animation: ultt-loading-pulse-ring 2s ease-in-out infinite;
+      }
+      .ultt-loading-title {
+        font-size: 1.25rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        margin: 0 0 0.35rem;
+      }
+      .ultt-loading-subtitle {
+        font-size: 0.8rem;
+        color: #9ca3af;
+        margin: 0 0 1rem;
+      }
+      .ultt-loading-badge {
+        display: inline-block;
+        font-size: 0.7rem;
+        font-weight: 800;
+        letter-spacing: 0.15em;
+        color: #FCDD09;
+        background: rgba(200, 16, 46, 0.2);
+        border: 1px solid #C8102E;
+        border-radius: 4px;
+        padding: 0.2rem 0.65rem;
+        margin-bottom: 1.75rem;
+      }
+      .ultt-loading-bar-track {
+        width: 100%;
+        height: 4px;
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 999px;
+        overflow: hidden;
+        margin-bottom: 0.75rem;
+      }
+      .ultt-loading-bar-fill {
+        height: 100%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #C8102E 0%, #FCDD09 50%, #C8102E 100%);
+        background-size: 200% 100%;
+        animation: ultt-loading-shimmer 1.8s linear infinite;
+        transition: width 0.3s ease-out;
+      }
+      .ultt-loading-status {
+        font-size: 0.75rem;
+        color: #6b7280;
+        margin: 0;
+        min-height: 1.125rem;
+      }
+      .ultt-loading-footer {
+        position: absolute;
+        bottom: 1.5rem;
+        font-size: 0.65rem;
+        color: #4b5563;
+        text-align: center;
+        padding: 0 1.5rem;
+        margin: 0;
+      }
+    </style>
   </head>
   <body>
+    <!-- Outside #root so React does not remove this until JS dismisses it -->
+    <div id="ultt-splash" aria-hidden="true">
+      <div class="ultt-splash-stripes"></div>
+      <div class="ultt-splash-logo">ULTT</div>
+      <p class="ultt-splash-title">Uganda Land Tax Tracker</p>
+      <p class="ultt-splash-sub">Loading official platform…</p>
+      <div class="ultt-splash-bar-track">
+        <div class="ultt-splash-bar-fill"></div>
+      </div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

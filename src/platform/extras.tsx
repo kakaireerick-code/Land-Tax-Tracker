@@ -19,12 +19,36 @@ export function MeetingRoomPage({ currentUser, users, showToast, isSuperAdmin }:
   const [meetings, setMeetings] = useState<BookedMeeting[]>(() => loadJson('ultt_meetings', []));
   const [meetForm, setMeetForm] = useState({ title: '', description: '', date: '', startTime: '', endTime: '', attendees: [] as string[], platform: 'Zoom Meeting' as BookedMeeting['platform'], locationNotes: '' });
   const [booked, setBooked] = useState<BookedMeeting | null>(null);
-  const chatEnd = useRef<HTMLDivElement>(null);
+  const chatRef = useRef<HTMLDivElement>(null);
+  const [userScrolledUp, setUserScrolledUp] = useState(false);
   const docRef = useRef<HTMLInputElement>(null);
+
+  const chatContainerStyle: React.CSSProperties = {
+    height: '400px',
+    overflowY: 'scroll',
+    overflowX: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
+    scrollBehavior: 'smooth',
+  };
 
   function safeNotes() { return loadJson('ultt_meeting_notes', ''); }
 
-  useEffect(() => { saveJson('ultt_meeting_chat', messages.slice(-50)); chatEnd.current?.scrollIntoView(); }, [messages]);
+  const handleChatScroll = () => {
+    if (!chatRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = chatRef.current;
+    const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+    setUserScrolledUp(!isNearBottom);
+  };
+
+  useEffect(() => { saveJson('ultt_meeting_chat', messages.slice(-50)); }, [messages]);
+
+  useEffect(() => {
+    if (!userScrolledUp && chatRef.current) {
+      chatRef.current.scrollTop = chatRef.current.scrollHeight;
+    }
+  }, [messages, userScrolledUp]);
+
   useEffect(() => { const i = setInterval(() => { setMessages(loadJson('ultt_meeting_chat', [])); }, 2000); return () => clearInterval(i); }, []);
   useEffect(() => { const i = setInterval(() => { saveJson('ultt_meeting_notes', notes); setLastSaved(formatDate(new Date(), 'MMM d, HH:mm')); }, 30000); return () => clearInterval(i); }, [notes]);
 
@@ -66,35 +90,135 @@ export function MeetingRoomPage({ currentUser, users, showToast, isSuperAdmin }:
   };
 
   return (
-    <div className="space-y-4 animate-fadeIn">
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Meeting Room</h1>
-      <div className="flex gap-2 flex-wrap">{(['chat', 'docs', 'announcements', 'notes', 'booking'] as const).map((t) => (
-        <button key={t} onClick={() => setTab(t)} className={`px-3 py-1 rounded text-sm capitalize ${tab === t ? 'bg-[#C8102E] text-white' : 'bg-gray-200'}`}>{t === 'booking' ? 'Book Meeting' : t}</button>
-      ))}</div>
-      {tab === 'chat' && (
-        <div className="grid lg:grid-cols-5 gap-4 h-[500px]">
-          <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-lg shadow flex flex-col">
-            <div className="p-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-900 dark:text-white">Admin Chat Room</div>
-            <div className="flex-1 overflow-y-auto p-3 space-y-2">
-              {messages.map((m) => (
-                <div key={m.id} className={`flex ${m.sender === currentUser.fullName ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[80%] p-2 rounded-lg text-sm ${m.sender === currentUser.fullName ? 'bg-[#C8102E] text-white' : 'bg-gray-800 text-white'}`}>
-                    <p className="text-xs opacity-70">{m.sender} <span className="inline-block w-2 h-2 bg-green-400 rounded-full ml-1" /> {m.timestamp}</p>
-                    {m.message}
-                  </div>
+    <div
+      className="animate-fadeIn"
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: 'calc(100vh - 60px)',
+        overflow: 'hidden',
+      }}
+    >
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-white shrink-0 px-1 pt-1">Meeting Room</h1>
+
+      <div className="flex gap-2 flex-wrap shrink-0 px-1 py-2">
+        {(['chat', 'docs', 'announcements', 'notes', 'booking'] as const).map((t) => (
+          <button key={t} onClick={() => setTab(t)} className={`px-3 py-1 rounded text-sm capitalize ${tab === t ? 'bg-[#C8102E] text-white' : 'bg-gray-200 dark:bg-gray-700 dark:text-gray-200'}`}>
+            {t === 'booking' ? 'Book Meeting' : t}
+          </button>
+        ))}
+      </div>
+
+      <div
+        style={{
+          display: 'flex',
+          flex: 1,
+          overflow: 'hidden',
+          gap: '16px',
+          padding: '16px',
+          minHeight: 0,
+        }}
+      >
+        {tab === 'chat' && (
+          <>
+            <div
+              style={{
+                width: '40%',
+                minWidth: '280px',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+              }}
+              className="bg-white dark:bg-gray-800 rounded-lg shadow"
+            >
+              <div className="p-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-900 dark:text-white shrink-0">
+                Admin Chat Room
+              </div>
+              <div className="relative shrink-0">
+                <div
+                  ref={chatRef}
+                  onScroll={handleChatScroll}
+                  style={chatContainerStyle}
+                  className="p-3 space-y-2"
+                >
+                  {messages.map((m) => (
+                    <div key={m.id} className={`flex ${m.sender === currentUser.fullName ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`max-w-[80%] p-2 rounded-lg text-sm ${m.sender === currentUser.fullName ? 'bg-[#C8102E] text-white' : 'bg-gray-800 text-white'}`}>
+                        <p className="text-xs opacity-70">{m.sender} <span className="inline-block w-2 h-2 bg-green-400 rounded-full ml-1" /> {m.timestamp}</p>
+                        {m.message}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}<div ref={chatEnd} />
+                {userScrolledUp && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUserScrolledUp(false);
+                      if (chatRef.current) {
+                        chatRef.current.scrollTop = chatRef.current.scrollHeight;
+                      }
+                    }}
+                    style={{
+                      position: 'absolute',
+                      bottom: '12px',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      backgroundColor: '#C8102E',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '20px',
+                      padding: '6px 16px',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                      zIndex: 10,
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                    }}
+                  >
+                    ↓ New messages
+                  </button>
+                )}
+              </div>
+              <div className="p-3 border-t border-gray-200 dark:border-gray-700 flex gap-2 shrink-0">
+                <input value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && sendChat()} className="flex-1 border rounded px-3 py-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="Type message..." />
+                <button onClick={sendChat} className="bg-[#C8102E] text-white px-4 rounded">Send</button>
+              </div>
             </div>
-            <div className="p-3 border-t flex gap-2">
-              <input value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && sendChat()} className="flex-1 border rounded px-3 py-2" placeholder="Type message..." />
-              <button onClick={sendChat} className="bg-[#C8102E] text-white px-4 rounded">Send</button>
+            <div
+              style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}
+              className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-sm text-gray-500 dark:text-gray-400"
+            >
+              <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Documents & Announcements</h3>
+              <p>Switch to the <strong>docs</strong> or <strong>announcements</strong> tabs to share files and post updates. Chat messages persist locally for all admins.</p>
+              {docs.length > 0 && (
+                <div className="mt-4">
+                  <p className="font-medium text-gray-700 dark:text-gray-300 mb-2">Recent documents ({docs.length})</p>
+                  <ul className="space-y-1">
+                    {docs.slice(-5).map((d) => (
+                      <li key={d.id} className="text-xs">{d.filename} — {d.uploadedBy}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {announcements.length > 0 && (
+                <div className="mt-4">
+                  <p className="font-medium text-gray-700 dark:text-gray-300 mb-2">Recent announcements ({announcements.length})</p>
+                  <ul className="space-y-1">
+                    {announcements.slice(-3).map((a) => (
+                      <li key={a.id} className="text-xs">{a.title} — {a.priority}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
-          </div>
-          <div className="lg:col-span-3 bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-sm text-gray-500 dark:text-gray-400">Documents & Announcements available in tabs above. Chat messages persist locally for all admins.</div>
-        </div>
-      )}
-      {tab === 'docs' && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+          </>
+        )}
+
+        {tab === 'docs' && (
+          <div
+            style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}
+            className="bg-white dark:bg-gray-800 rounded-lg shadow p-4"
+          >
           <button onClick={() => docRef.current?.click()} className="mb-4 bg-gray-800 text-white px-4 py-2 rounded flex items-center gap-2"><Plus size={16} /> Upload Document</button>
           <input ref={docRef} type="file" accept=".pdf,.docx,.xlsx,image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadDoc(f); }} />
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">Documents shared here are visible to all Admins</p>
@@ -107,10 +231,14 @@ export function MeetingRoomPage({ currentUser, users, showToast, isSuperAdmin }:
               </div>
             </div>
           ))}
-        </div>
-      )}
-      {tab === 'announcements' && (
-        <div className="space-y-4">
+          </div>
+        )}
+
+        {tab === 'announcements' && (
+          <div
+            style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}
+            className="space-y-4"
+          >
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 grid gap-3">
             <input placeholder="Title" value={annForm.title} onChange={(e) => setAnnForm({ ...annForm, title: e.target.value })} className="border rounded px-3 py-2" />
             <textarea placeholder="Message" value={annForm.body} onChange={(e) => setAnnForm({ ...annForm, body: e.target.value })} className="border rounded px-3 py-2" rows={3} />
@@ -122,10 +250,14 @@ export function MeetingRoomPage({ currentUser, users, showToast, isSuperAdmin }:
               <h3 className="font-bold text-gray-900 dark:text-white">{a.title}</h3><p className="text-sm text-gray-700 dark:text-gray-300">{a.body}</p><p className="text-xs text-gray-500 dark:text-gray-400 mt-2">{a.postedBy} — {a.date}</p>
             </div>
           ))}
-        </div>
-      )}
-      {tab === 'notes' && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+          </div>
+        )}
+
+        {tab === 'notes' && (
+          <div
+            style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}
+            className="bg-white dark:bg-gray-800 rounded-lg shadow p-4"
+          >
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full border rounded p-3 h-48" />
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Last saved: {lastSaved || 'Not yet saved'}</p>
           <div className="flex gap-2 mt-2">
@@ -133,9 +265,13 @@ export function MeetingRoomPage({ currentUser, users, showToast, isSuperAdmin }:
             {isSuperAdmin && <button onClick={() => { if (confirm('Clear all notes?')) setNotes(''); }} className="bg-red-600 text-white px-4 py-2 rounded text-sm">Clear Notes</button>}
           </div>
         </div>
-      )}
-      {tab === 'booking' && (
-        <div className="space-y-4">
+        )}
+
+        {tab === 'booking' && (
+          <div
+            style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}
+            className="space-y-4"
+          >
           {booked && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
               <h3 className="font-bold text-gray-900 dark:text-white">{booked.title}</h3>
@@ -170,8 +306,9 @@ export function MeetingRoomPage({ currentUser, users, showToast, isSuperAdmin }:
             </div>
           ))}</div>
           <p className="text-xs text-gray-500 dark:text-gray-400 italic">Note: Meeting links above are generated placeholders. To generate real Zoom or Google Meet links, the Super Admin must connect the platform to Zoom API or Google Calendar API.</p>
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
