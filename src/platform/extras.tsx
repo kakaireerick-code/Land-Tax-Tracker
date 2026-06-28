@@ -5,7 +5,8 @@ import { loadJson, saveJson } from '../lib/storage';
 import { normalizeChatMessage } from '../lib/chatMerge';
 import { fetchChatState, pushChatState, type ChatSyncMode } from '../lib/chatSync';
 import type { AppUser, PlatformSettings, DemoUsageLog, ChatMessage, ChatReactionEmoji, PrivateChatRoom, SharedDocument, Announcement, BookedMeeting, ShareHistoryItem, AutoEscalationRule, EscalationLogEntry } from '../types/platform';
-import { DISTRICTS } from '../types/platform';
+import { FlatDistrictSelect } from '../components/DistrictSelect';
+import { DISTRICT_NAMES } from '../data/districts';
 import { UgandaCoatOfArms, UGANDA_COAT_OF_ARMS_TEXT } from '../components/UgandaCoatOfArms';
 import type { Property } from '../property';
 
@@ -703,9 +704,17 @@ export function SettingsPage({ settings, setSettings, onNavigateImport, onExport
       <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Settings</h1>
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-3">
         <h3 className="ultt-section-title">Platform Configuration</h3>
-        {(['authorityName', 'districtName', 'revenueOfficeContact', 'bankAccountDetails', 'officialStampText'] as const).map((k) => (
-          <input key={k} placeholder={k.replace(/([A-Z])/g, ' $1')} value={settings[k]} onChange={(e) => setSettings({ ...settings, [k]: e.target.value })} className="w-full border rounded px-3 py-2" />
+        {(['authorityName', 'revenueOfficeContact', 'bankAccountDetails', 'officialStampText'] as const).map((k) => (
+          <input key={k} placeholder={k.replace(/([A-Z])/g, ' $1')} value={settings[k]} onChange={(e) => setSettings({ ...settings, [k]: e.target.value })} className="w-full border rounded px-3 py-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
         ))}
+        <div>
+          <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">District</label>
+          <FlatDistrictSelect
+            value={settings.districtName || 'Kampala'}
+            onChange={(d) => setSettings({ ...settings, districtName: d })}
+            className="w-full border rounded px-3 py-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+          />
+        </div>
         <button onClick={save} className="bg-[#C8102E] text-white px-6 py-2 rounded">Save</button>
       </div>
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-3">
@@ -810,8 +819,9 @@ export function AutoEscalationPage({ rules, setRules, setProperties, onLog, show
         <div key={r.id} className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 flex flex-wrap gap-4 items-center justify-between">
           <div><h3 className="font-medium">{r.label}</h3><p className="text-sm text-gray-500 dark:text-gray-400">{r.description}</p></div>
           <label className="flex items-center gap-2"><input type="checkbox" checked={r.enabled} onChange={(e) => setRules((prev) => prev.map((x) => x.id === r.id ? { ...x, enabled: e.target.checked } : x))} /> On</label>
-          <select value={r.district} onChange={(e) => setRules((prev) => prev.map((x) => x.id === r.id ? { ...x, district: e.target.value } : x))} className="border rounded px-3 py-2 text-sm">
-            <option value="">All Districts</option>{DISTRICTS.map((d) => <option key={d}>{d}</option>)}
+          <select value={r.district} onChange={(e) => setRules((prev) => prev.map((x) => x.id === r.id ? { ...x, district: e.target.value } : x))} className="border rounded px-3 py-2 text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+            <option value="">All Districts</option>
+            {DISTRICT_NAMES.map((d) => <option key={d} value={d}>{d}</option>)}
           </select>
         </div>
       ))}

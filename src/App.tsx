@@ -52,6 +52,8 @@ import {
   AutoEscalationPage, HelpPage, RentInterceptionModal, getNextAction,
 } from './platform/extras';
 import { createDemoProperties } from './data/demo';
+import { UGANDA_DISTRICT_COUNT, DISTRICT_REGION_MAP, REGION_DESCRIPTIONS } from './data/districts';
+import { FlatDistrictSelect, GroupedDistrictSelect } from './components/DistrictSelect';
 import { loadJson, saveJson } from './lib/storage';
 import type { AppUser, UserRole, PlatformSettings, EscalationLogEntry, DemoUsageLog } from './types/platform';
 import { ROLE_LABELS } from './types/platform';
@@ -226,16 +228,16 @@ const mockProperties: Property[] = [
   { id: 7, plotNumber: 'MKN-001', ownerName: 'Emmanuel Lwanga', ownerPhone: '+256 700 789012', district: 'Mukono', subCounty: 'Central', propertyType: 'Commercial', landTitleNumber: 'LT-2020-156', lat: 0.3515, lng: 32.7545, annualTaxDue: 4500000, principalOwed: 4500000, taxDueDate: '2023-12-01', lastPaymentDate: null, tenantName: 'Steven Musoke', tenantPhone: '+256 700 890123', rentalIncomeDeclared: 6000000, status: 'delinquent', enforcementStage: 'demand_notice', notes: '' },
   { id: 8, plotNumber: 'MKN-002', ownerName: 'Hellen Namulinda', ownerPhone: '+256 700 890123', district: 'Mukono', subCounty: 'Seeta', propertyType: 'Residential', landTitleNumber: 'LT-2021-267', lat: 0.3789, lng: 32.7123, annualTaxDue: 550000, principalOwed: 0, taxDueDate: '2024-07-01', lastPaymentDate: '2024-06-25', tenantName: null, tenantPhone: null, rentalIncomeDeclared: 0, status: 'paid', enforcementStage: 'resolved', notes: '' },
   { id: 9, plotNumber: 'GUL-001', ownerName: 'Patrick Ochieng', ownerPhone: '+256 700 901234', district: 'Gulu', subCounty: 'Central', propertyType: 'Commercial', landTitleNumber: 'LT-2019-345', lat: 2.7744, lng: 32.2997, annualTaxDue: 2800000, principalOwed: 2800000, taxDueDate: '2024-02-01', lastPaymentDate: null, tenantName: null, tenantPhone: null, rentalIncomeDeclared: 0, status: 'delinquent', enforcementStage: 'interest_accruing', notes: '' },
-  { id: 10, plotNumber: 'GUL-002', ownerName: 'Beatrice Acheng', ownerPhone: '+256 700 012345', district: 'Gulu', subCounty: 'Layibi', propertyType: 'Residential', landTitleNumber: 'LT-2022-456', lat: 2.7856, lng: 32.3123, annualTaxDue: 400000, principalOwed: 400000, taxDueDate: '2024-04-01', lastPaymentDate: null, tenantName: null, tenantPhone: null, rentalIncomeDeclared: 0, status: 'delinquent', enforcementStage: 'interest_accruing', notes: '' },
+  { id: 10, plotNumber: 'ARU-001', ownerName: 'Beatrice Acheng', ownerPhone: '+256 700 012345', district: 'Arua', subCounty: 'Layibi', propertyType: 'Residential', landTitleNumber: 'LT-2022-456', lat: 3.0196, lng: 30.9117, annualTaxDue: 400000, principalOwed: 400000, taxDueDate: '2024-04-01', lastPaymentDate: null, tenantName: null, tenantPhone: null, rentalIncomeDeclared: 0, status: 'delinquent', enforcementStage: 'interest_accruing', notes: '' },
   { id: 11, plotNumber: 'MBR-001', ownerName: 'Charles Banyenzaki', ownerPhone: '+256 700 123789', district: 'Mbarara', subCounty: 'Central', propertyType: 'Commercial', landTitleNumber: 'LT-2017-067', lat: -0.6147, lng: 30.6556, annualTaxDue: 6200000, principalOwed: 6200000, taxDueDate: '2023-06-01', lastPaymentDate: null, tenantName: 'Ivan Tumwine', tenantPhone: '+256 700 234890', rentalIncomeDeclared: 8400000, status: 'delinquent', enforcementStage: 'legal_action', notes: 'Court hearing pending' },
   { id: 12, plotNumber: 'MBR-002', ownerName: 'Diana Atuhaire', ownerPhone: '+256 700 234890', district: 'Mbarara', subCounty: 'Nyamitanga', propertyType: 'Residential', landTitleNumber: 'LT-2023-567', lat: -0.6234, lng: 30.6678, annualTaxDue: 720000, principalOwed: 0, taxDueDate: '2024-08-01', lastPaymentDate: '2024-07-30', tenantName: null, tenantPhone: null, rentalIncomeDeclared: 0, status: 'paid', enforcementStage: 'resolved', notes: '' },
   { id: 13, plotNumber: 'KLA-004', ownerName: 'Francis Walugembe', ownerPhone: '+256 700 345901', district: 'Kampala', subCounty: 'Rubaga', propertyType: 'Commercial', landTitleNumber: 'LT-2016-023', lat: 0.3012, lng: 32.5567, annualTaxDue: 9500000, principalOwed: 9500000, taxDueDate: '2023-03-01', lastPaymentDate: null, tenantName: 'Robert Ssekandi', tenantPhone: '+256 700 456012', rentalIncomeDeclared: 12000000, status: 'delinquent', enforcementStage: 'rent_interception', notes: 'Multiple properties affected' },
   { id: 14, plotNumber: 'WKS-004', ownerName: 'Grace Nalubowa', ownerPhone: '+256 700 456012', district: 'Wakiso', subCounty: 'Busiro', propertyType: 'Residential', landTitleNumber: 'LT-2020-678', lat: 0.4123, lng: 32.4890, annualTaxDue: 480000, principalOwed: 480000, taxDueDate: '2024-05-01', lastPaymentDate: null, tenantName: null, tenantPhone: null, rentalIncomeDeclared: 0, status: 'delinquent', enforcementStage: 'demand_notice', notes: '' },
   { id: 15, plotNumber: 'MKN-003', ownerName: 'Joseph Ssekiziyivu', ownerPhone: '+256 700 567123', district: 'Mukono', subCounty: 'Nagojje', propertyType: 'Industrial', landTitleNumber: 'LT-2015-089', lat: 0.4234, lng: 32.7890, annualTaxDue: 7200000, principalOwed: 7200000, taxDueDate: '2023-01-01', lastPaymentDate: null, tenantName: 'Tech Solutions Ltd', tenantPhone: '+256 700 678234', rentalIncomeDeclared: 15000000, status: 'delinquent', enforcementStage: 'legal_action', notes: 'Company director summons issued' },
   { id: 16, plotNumber: 'GUL-003', ownerName: 'Margaret Lalam', ownerPhone: '+256 700 678234', district: 'Gulu', subCounty: 'Pece', propertyType: 'Commercial', landTitleNumber: 'LT-2021-789', lat: 2.7654, lng: 32.2789, annualTaxDue: 1800000, principalOwed: 900000, taxDueDate: '2024-03-01', lastPaymentDate: '2024-04-15', tenantName: null, tenantPhone: null, rentalIncomeDeclared: 0, status: 'partial', enforcementStage: 'interest_accruing', notes: '' },
-  { id: 17, plotNumber: 'MBR-003', ownerName: 'Simon Taremwa', ownerPhone: '+256 700 789345', district: 'Mbarara', subCounty: 'Kakoba', propertyType: 'Residential', landTitleNumber: 'LT-2022-890', lat: -0.6012, lng: 30.6456, annualTaxDue: 600000, principalOwed: 600000, taxDueDate: '2024-06-01', lastPaymentDate: null, tenantName: null, tenantPhone: null, rentalIncomeDeclared: 0, status: 'delinquent', enforcementStage: 'demand_notice', notes: '' },
+  { id: 17, plotNumber: 'HOI-001', ownerName: 'Simon Taremwa', ownerPhone: '+256 700 789345', district: 'Hoima', subCounty: 'Kakoba', propertyType: 'Residential', landTitleNumber: 'LT-2022-890', lat: 1.4319, lng: 31.3524, annualTaxDue: 600000, principalOwed: 600000, taxDueDate: '2024-06-01', lastPaymentDate: null, tenantName: null, tenantPhone: null, rentalIncomeDeclared: 0, status: 'delinquent', enforcementStage: 'demand_notice', notes: '' },
   { id: 18, plotNumber: 'KLA-005', ownerName: 'Victoria Namugga', ownerPhone: '+256 700 890456', district: 'Kampala', subCounty: 'Kawempe', propertyType: 'Commercial', landTitleNumber: 'LT-2019-901', lat: 0.3456, lng: 32.5678, annualTaxDue: 3800000, principalOwed: 3800000, taxDueDate: '2024-01-15', lastPaymentDate: null, tenantName: null, tenantPhone: null, rentalIncomeDeclared: 0, status: 'delinquent', enforcementStage: 'rent_interception', notes: '' },
-  { id: 19, plotNumber: 'WKS-005', ownerName: 'William Senyonyi', ownerPhone: '+256 700 901567', district: 'Wakiso', subCounty: 'Gayaza', propertyType: 'Residential', landTitleNumber: 'LT-2023-012', lat: 0.4234, lng: 32.6012, annualTaxDue: 550000, principalOwed: 550000, taxDueDate: '2024-04-01', lastPaymentDate: null, tenantName: null, tenantPhone: null, rentalIncomeDeclared: 0, status: 'delinquent', enforcementStage: 'interest_accruing', notes: '' },
+  { id: 19, plotNumber: 'JIN-001', ownerName: 'William Senyonyi', ownerPhone: '+256 700 901567', district: 'Jinja', subCounty: 'Central', propertyType: 'Residential', landTitleNumber: 'LT-2023-012', lat: 0.4244, lng: 33.2042, annualTaxDue: 550000, principalOwed: 550000, taxDueDate: '2024-04-01', lastPaymentDate: null, tenantName: null, tenantPhone: null, rentalIncomeDeclared: 0, status: 'delinquent', enforcementStage: 'interest_accruing', notes: '' },
   { id: 20, plotNumber: 'MKN-004', ownerName: 'Annet Nalwoga', ownerPhone: '+256 700 012678', district: 'Mukono', subCounty: 'Goma', propertyType: 'Commercial', landTitleNumber: 'LT-2018-123', lat: 0.4012, lng: 32.7345, annualTaxDue: 2900000, principalOwed: 2900000, taxDueDate: '2023-11-01', lastPaymentDate: null, tenantName: 'Johnson Mutebi', tenantPhone: '+256 700 123789', rentalIncomeDeclared: 4200000, status: 'delinquent', enforcementStage: 'demand_notice', notes: '' },
 ];
 
@@ -852,11 +854,11 @@ function DashboardPage({ properties, enforcementActions }: DashboardPageProps) {
   }, [properties]);
 
   const districtData = useMemo(() => {
-    const districts = ['Kampala', 'Wakiso', 'Mukono', 'Gulu', 'Mbarara'];
-    return districts.map(d => ({
+    const withData = [...new Set(properties.map((p) => p.district))].sort();
+    return withData.map((d) => ({
       name: d,
-      delinquent: properties.filter(p => p.district === d && p.status === 'delinquent').length,
-      total: properties.filter(p => p.district === d).length,
+      delinquent: properties.filter((p) => p.district === d && p.status === 'delinquent').length,
+      total: properties.filter((p) => p.district === d).length,
     }));
   }, [properties]);
 
@@ -895,6 +897,7 @@ function DashboardPage({ properties, enforcementActions }: DashboardPageProps) {
         <SummaryCard title="Properties Blocked From Sale" value={stats.blockedFromSale.toString()} icon={<Ban className="text-red-500" />} />
         <SummaryCard title="Active Legal Cases" value={stats.legalAction.toString()} icon={<Scale className="text-[#C8102E]" />} />
         <SummaryCard title="Paid This Period" value={stats.paid.toString()} icon={<CheckCircle className="text-green-600" />} />
+        <SummaryCard title="Districts Covered" value={UGANDA_DISTRICT_COUNT.toString()} icon={<MapPin className="text-[#C8102E]" />} />
       </div>
 
       {/* Charts Row */}
@@ -1082,14 +1085,12 @@ function PropertyDatabasePage({
               className="w-full pl-10 pr-4 py-2 ultt-input"
             />
           </div>
-          <select value={districtFilter} onChange={(e) => setDistrictFilter(e.target.value)} className="ultt-select px-3 py-2">
-            <option value="">All Districts</option>
-            <option value="Kampala">Kampala</option>
-            <option value="Wakiso">Wakiso</option>
-            <option value="Mukono">Mukono</option>
-            <option value="Gulu">Gulu</option>
-            <option value="Mbarara">Mbarara</option>
-          </select>
+          <FlatDistrictSelect
+            value={districtFilter}
+            onChange={setDistrictFilter}
+            includeAll
+            className="ultt-select px-3 py-2"
+          />
           <select value={stageFilter} onChange={(e) => setStageFilter(e.target.value)} className="ultt-select px-3 py-2">
             <option value="">All Stages</option>
             <option value="interest_accruing">Interest Accruing</option>
@@ -1376,40 +1377,38 @@ function UgandaMapPage({
   const regions = useMemo(() => ({
     central: {
       name: 'Central Region',
-      districts: ['Kampala', 'Wakiso', 'Mukono'],
+      region: 'Central' as const,
+      description: REGION_DESCRIPTIONS.Central,
       path: 'M150,280 L180,250 L220,260 L240,290 L230,330 L190,340 L160,310 Z',
       centroid: { x: 195, y: 295 },
     },
     northern: {
       name: 'Northern Region',
-      districts: ['Gulu', 'Lira'],
+      region: 'Northern' as const,
+      description: REGION_DESCRIPTIONS.Northern,
       path: 'M150,100 L190,80 L230,90 L250,130 L240,170 L200,190 L160,180 L140,140 Z',
       centroid: { x: 195, y: 135 },
     },
     eastern: {
       name: 'Eastern Region',
-      districts: ['Mbale', 'Jinja'],
+      region: 'Eastern' as const,
+      description: REGION_DESCRIPTIONS.Eastern,
       path: 'M250,200 L290,180 L330,200 L340,250 L320,290 L280,300 L250,270 Z',
       centroid: { x: 295, y: 245 },
     },
     western: {
       name: 'Western Region',
-      districts: ['Mbarara', 'Fort Portal'],
+      region: 'Western' as const,
+      description: REGION_DESCRIPTIONS.Western,
       path: 'M60,250 L100,220 L140,240 L150,290 L130,340 L90,350 L60,310 Z',
       centroid: { x: 105, y: 285 },
-    },
-    northeast: {
-      name: 'North Eastern Region',
-      districts: ['Moroto'],
-      path: 'M260,80 L300,60 L340,80 L350,130 L330,170 L290,180 L260,150 Z',
-      centroid: { x: 305, y: 120 },
     },
   }), []);
 
   const regionStats = useMemo(() => {
     const stats: { [key: string]: { properties: Property[]; delinquent: number; totalOwed: number; color: string } } = {};
     Object.entries(regions).forEach(([key, region]) => {
-      const regionProperties = properties.filter(p => region.districts.includes(p.district));
+      const regionProperties = properties.filter((p) => DISTRICT_REGION_MAP[p.district] === region.region);
       const delinquent = regionProperties.filter(p => p.status === 'delinquent');
       let totalOwed = 0;
       delinquent.forEach(p => {
@@ -1522,8 +1521,8 @@ function UgandaMapPage({
               <h3 className="font-bold text-lg">{selectedRegionData.name}</h3>
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Districts</span>
-                  <span>{selectedRegionData.districts.join(', ')}</span>
+                  <span className="text-gray-600 dark:text-gray-400">Coverage</span>
+                  <span className="text-right text-sm">{selectedRegionData.description}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600 dark:text-gray-400">Total Properties</span>
@@ -2721,18 +2720,12 @@ function NotificationsPage({
               <option value="demand_notice">Demand Notice</option>
               <option value="rent_interception">Rent Interception</option>
             </select>
-            <select
+            <FlatDistrictSelect
               value={bulkFilters.district}
-              onChange={(e) => setBulkFilters({ ...bulkFilters, district: e.target.value })}
+              onChange={(d) => setBulkFilters({ ...bulkFilters, district: d })}
+              includeAll
               className="ultt-select px-4 py-2"
-            >
-              <option value="">All Districts</option>
-              <option value="Kampala">Kampala</option>
-              <option value="Wakiso">Wakiso</option>
-              <option value="Mukono">Mukono</option>
-              <option value="Gulu">Gulu</option>
-              <option value="Mbarara">Mbarara</option>
-            </select>
+            />
           </div>
 
           <div className="flex items-center gap-4 mb-4">
@@ -2859,18 +2852,13 @@ function NotificationsPage({
 // Analytics Page
 function AnalyticsPage({ properties, demoMode = false }: { properties: Property[]; demoMode?: boolean }) {
   const districtData = useMemo(() => {
-    const districts = ['Kampala', 'Wakiso', 'Mukono', 'Gulu', 'Mbarara'];
-    return districts.map(d => {
-      const districtProps = properties.filter(p => p.district === d);
-      const collected = districtProps.filter(p => p.status === 'paid').reduce((sum, p) => sum + p.annualTaxDue, 0);
+    const withData = [...new Set(properties.map((p) => p.district))].sort();
+    return withData.map((d) => {
+      const districtProps = properties.filter((p) => p.district === d);
+      const collected = districtProps.filter((p) => p.status === 'paid').reduce((sum, p) => sum + p.annualTaxDue, 0);
       const target = districtProps.reduce((sum, p) => sum + p.annualTaxDue, 0);
       const rate = target > 0 ? Math.round((collected / target) * 100) : 0;
-      return {
-        name: d,
-        collected,
-        target,
-        rate,
-      };
+      return { name: d, collected, target, rate };
     });
   }, [properties]);
 
@@ -3172,18 +3160,12 @@ Signed: _____________ Date: _____________`;
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium mb-2">District</label>
-            <select
+            <GroupedDistrictSelect
               value={district}
-              onChange={(e) => setDistrict(e.target.value)}
+              onChange={setDistrict}
+              includeAll
               className="w-full ultt-input px-4 py-2"
-            >
-              <option value="">All Districts</option>
-              <option value="Kampala">Kampala</option>
-              <option value="Wakiso">Wakiso</option>
-              <option value="Mukono">Mukono</option>
-              <option value="Gulu">Gulu</option>
-              <option value="Mbarara">Mbarara</option>
-            </select>
+            />
           </div>
           <div>
             <label className="block text-sm font-medium mb-2">Period</label>

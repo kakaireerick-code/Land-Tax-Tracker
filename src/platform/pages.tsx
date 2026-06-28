@@ -6,7 +6,9 @@ import { formatDate, formatCurrency, calculatePenalty, downloadTextFile, parseCS
 import type {
   AppUser, UserRole, PlatformSettings, RoleChangeLog, AutoEscalationRule,
 } from '../types/platform';
-import { DISTRICTS, ROLE_LABELS } from '../types/platform';
+import { DISTRICT_NAMES, isKnownDistrict } from '../data/districts';
+import { FlatDistrictSelect } from '../components/DistrictSelect';
+import { ROLE_LABELS } from '../types/platform';
 import type { Property } from '../property';
 import { UgandaCoatOfArms } from '../components/UgandaCoatOfArms';
 
@@ -141,9 +143,7 @@ export function LoginPage({ onLogin, users }: { onLogin: (u: { username: string;
           <form onSubmit={handleLogin} className="space-y-4">
             <input type="text" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full ultt-input px-4 py-3" />
             <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full ultt-input px-4 py-3" />
-            <select value={district} onChange={(e) => setDistrict(e.target.value)} className="w-full ultt-select px-4 py-3">
-              {DISTRICTS.filter((d) => !d.startsWith('DEMO') && !d.startsWith('Training')).map((d) => <option key={d} value={d}>{d}</option>)}
-            </select>
+            <FlatDistrictSelect value={district} onChange={setDistrict} className="w-full ultt-select px-4 py-3" />
             <select value={role} onChange={(e) => setRole(e.target.value as UserRole)} className="w-full ultt-select px-4 py-3">
               {(Object.keys(ROLE_LABELS) as UserRole[]).map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
             </select>
@@ -251,6 +251,7 @@ export function DataImportPage({ onImport, showToast }: { onImport: (props: Prop
       if (!obj.plotNumber) errors.push('Missing plot number');
       if (!obj.ownerName) errors.push('Missing owner name');
       if (!obj.district) errors.push('Missing district');
+      else if (!isKnownDistrict(obj.district)) warnings.push(`District "${obj.district}" not in official list`);
       if (obj.annualTaxDue && isNaN(Number(obj.annualTaxDue))) errors.push('Invalid tax amount');
       if (obj.taxDueDate && isNaN(new Date(obj.taxDueDate).getTime())) warnings.push('Invalid date format');
       return { row: obj, warnings, errors, index: ri };
@@ -405,7 +406,7 @@ export function UserManagementPage({ users, setUsers, roleChangeLog, setRoleChan
             <input key={f} type={f.includes('password') ? 'password' : 'text'} placeholder={f} value={form[f]} onChange={(e) => setForm({ ...form, [f]: e.target.value })} className="border rounded px-3 py-2" />
           ))}
           <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as UserRole })} className="border rounded px-3 py-2">{Object.entries(ROLE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
-          <select value={form.district} onChange={(e) => setForm({ ...form, district: e.target.value })} className="border rounded px-3 py-2">{DISTRICTS.filter((d) => !d.startsWith('DEMO')).map((d) => <option key={d}>{d}</option>)}</select>
+          <FlatDistrictSelect value={form.district} onChange={(d) => setForm({ ...form, district: d })} className="border rounded px-3 py-2" />
           <button onClick={saveUser} className="md:col-span-2 bg-[#C8102E] text-white py-2 rounded-lg">Save</button>
         </div>
       )}

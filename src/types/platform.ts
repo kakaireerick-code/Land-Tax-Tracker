@@ -125,8 +125,6 @@ export interface AutoEscalationRule {
   district: string;
 }
 
-export const DISTRICTS = ['Kampala', 'Wakiso', 'Mukono', 'Gulu', 'Mbarara', 'DEMO-Central', 'DEMO-North', 'Training-District'];
-
 export const ROLE_LABELS: Record<UserRole, string> = {
   superAdmin: 'Super Admin',
   admin: 'Admin',
