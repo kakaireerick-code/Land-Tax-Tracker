@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ultt-v1.1'
+const CACHE_NAME = 'ultt-v1.2'
 const STATIC_ASSETS = [
   '/manifest.json',
   '/icon.svg',

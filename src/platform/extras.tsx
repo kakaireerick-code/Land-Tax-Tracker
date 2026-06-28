@@ -2,20 +2,14 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Download, Plus, Trash2, X, Check, AlertTriangle, MessageCircle, Copy, Mail, Pin, Lock, Users } from 'lucide-react';
 import { formatDate, formatCurrency, calculatePenalty, downloadTextFile } from '../lib/helpers';
 import { loadJson, saveJson } from '../lib/storage';
+import { normalizeChatMessage } from '../lib/chatMerge';
+import { fetchChatState, pushChatState, type ChatSyncMode } from '../lib/chatSync';
 import type { AppUser, PlatformSettings, DemoUsageLog, ChatMessage, ChatReactionEmoji, PrivateChatRoom, SharedDocument, Announcement, BookedMeeting, ShareHistoryItem, AutoEscalationRule, EscalationLogEntry } from '../types/platform';
 import { DISTRICTS } from '../types/platform';
 import { UgandaCoatOfArms, UGANDA_COAT_OF_ARMS_TEXT } from '../components/UgandaCoatOfArms';
 import type { Property } from '../property';
 
 const CHAT_REACTIONS: ChatReactionEmoji[] = ['👍', '❤️', '😂', '⚠️', '✅'];
-
-function normalizeChatMessage(m: ChatMessage): ChatMessage {
-  return {
-    ...m,
-    pinned: m.pinned ?? false,
-    reactions: m.reactions ?? [],
-  };
-}
 
 export function MeetingRoomPage({ currentUser, users, showToast, isSuperAdmin }: { currentUser: AppUser; users: AppUser[]; showToast: (m: string, t?: 'success' | 'error') => void; isSuperAdmin: boolean }) {
   const [tab, setTab] = useState<'chat' | 'docs' | 'announcements' | 'notes' | 'booking'>('chat');
@@ -29,6 +23,8 @@ export function MeetingRoomPage({ currentUser, users, showToast, isSuperAdmin }:
     }))
   );
   const [activeChatId, setActiveChatId] = useState<'public' | string>('public');
+  const [syncMode, setSyncMode] = useState<ChatSyncMode>('local');
+  const syncModeRef = useRef<ChatSyncMode>('local');
   const [showCreateRoom, setShowCreateRoom] = useState(false);
   const [newRoomName, setNewRoomName] = useState('');
   const [newRoomMembers, setNewRoomMembers] = useState<string[]>([]);
@@ -63,8 +59,13 @@ export function MeetingRoomPage({ currentUser, users, showToast, isSuperAdmin }:
     setUserScrolledUp(!isNearBottom);
   };
 
-  useEffect(() => { saveJson('ultt_meeting_chat', messages.slice(-50)); }, [messages]);
-  useEffect(() => { saveJson('ultt_private_chat_rooms', privateRooms); }, [privateRooms]);
+  useEffect(() => {
+    syncModeRef.current = syncMode;
+  }, [syncMode]);
+
+  useEffect(() => {
+    pushChatState(messages, privateRooms, syncModeRef.current);
+  }, [messages, privateRooms]);
 
   const myPrivateRooms = useMemo(
     () => privateRooms.filter((r) => r.members.includes(currentUser.fullName)),
@@ -107,16 +108,22 @@ export function MeetingRoomPage({ currentUser, users, showToast, isSuperAdmin }:
   }, [activeMessages, userScrolledUp]);
 
   useEffect(() => {
-    const i = setInterval(() => {
-      setMessages((loadJson('ultt_meeting_chat', []) as ChatMessage[]).map(normalizeChatMessage));
-      setPrivateRooms(
-        (loadJson('ultt_private_chat_rooms', []) as PrivateChatRoom[]).map((r) => ({
-          ...r,
-          messages: (r.messages ?? []).map(normalizeChatMessage),
-        })),
-      );
-    }, 2000);
-    return () => clearInterval(i);
+    let cancelled = false;
+
+    const pull = async () => {
+      const state = await fetchChatState();
+      if (cancelled) return;
+      setSyncMode(state.mode);
+      setMessages(state.public);
+      setPrivateRooms(state.rooms);
+    };
+
+    pull();
+    const i = setInterval(pull, 2000);
+    return () => {
+      cancelled = true;
+      clearInterval(i);
+    };
   }, []);
   useEffect(() => { const i = setInterval(() => { saveJson('ultt_meeting_notes', notes); setLastSaved(formatDate(new Date(), 'MMM d, HH:mm')); }, 30000); return () => clearInterval(i); }, [notes]);
 
@@ -375,12 +382,24 @@ export function MeetingRoomPage({ currentUser, users, showToast, isSuperAdmin }:
               }}
               className="bg-white dark:bg-gray-800 rounded-lg shadow"
             >
-              <div className="p-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-900 dark:text-white shrink-0 flex items-center gap-2">
-                {activeChatId === 'public' ? (
-                  <><Users size={16} /> Admin Chat Room</>
-                ) : (
-                  <><Lock size={16} /> {myPrivateRooms.find((r) => r.id === activeChatId)?.name ?? 'Private Room'}</>
-                )}
+              <div className="p-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-900 dark:text-white shrink-0 flex items-center justify-between gap-2">
+                <span className="flex items-center gap-2 min-w-0">
+                  {activeChatId === 'public' ? (
+                    <><Users size={16} className="shrink-0" /> Admin Chat Room</>
+                  ) : (
+                    <><Lock size={16} className="shrink-0" /> {myPrivateRooms.find((r) => r.id === activeChatId)?.name ?? 'Private Room'}</>
+                  )}
+                </span>
+                <span
+                  className={`text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0 ${
+                    syncMode === 'cloud'
+                      ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'
+                      : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+                  }`}
+                  title={syncMode === 'cloud' ? 'Messages sync across all admins' : 'Local only — add Upstash Redis on Vercel for live sync'}
+                >
+                  {syncMode === 'cloud' ? '● Live sync' : 'Local only'}
+                </span>
               </div>
               {activeChatId !== 'public' && (
                 <p className="px-3 py-1 text-xs text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-700 shrink-0">
@@ -497,8 +516,9 @@ export function MeetingRoomPage({ currentUser, users, showToast, isSuperAdmin }:
             >
               <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Chat Guide</h3>
               <ul className="space-y-2 text-xs">
-                <li><strong>Public Admin</strong> — visible to all admins on this device.</li>
+                <li><strong>Public Admin</strong> — visible to all admins (live sync when cloud is enabled).</li>
                 <li><strong>Private rooms</strong> — only invited members can see messages.</li>
+                <li><strong>Live sync</strong> — connect Upstash Redis on Vercel so all admins see the same chat.</li>
                 <li><Pin size={12} className="inline" /> <strong>Pin</strong> — admins can pin important messages to the top.</li>
                 <li><strong>Reactions</strong> — click 👍 ❤️ 😂 ⚠️ ✅ on any message.</li>
               </ul>
